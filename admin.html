@@ -63,12 +63,22 @@ let isProcessing = false;
 /* ================= LOGIN ================= */
 window.login = async () => {
   const email = document.getElementById('email').value.trim();
-  const pass = document.getElementById('pass').value;
+  const pass = document.getElementById('password').value;
 
   if(!email || !pass){
     alert("❗ Email & Password লাগবে");
     return;
   }
+
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    alert("✅ Login Success");
+  } catch(e){
+    console.error(e);
+    alert("❌ Login Error: " + e.message);
+  }
+};
+
 
   try {
     await signInWithEmailAndPassword(auth, email, pass);
