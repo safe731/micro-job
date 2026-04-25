@@ -36,11 +36,12 @@ body { background:#f3f4f6; }
 
 <script type="module">
 
+/* ================= FIREBASE IMPORT ================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* 🔥 Firebase Config */
+/* ================= CONFIG ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
   authDomain: "mail-fact.firebaseapp.com",
@@ -51,60 +52,73 @@ const firebaseConfig = {
   appId: "1:800577449702:web:0576286f40bfac40451527"
 };
 
-/* 🔥 Init */
+/* ================= INIT ================= */
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-/* 🔐 LOGIN */
+/* ================= GLOBAL ================= */
+let isProcessing = false;
+
+/* ================= LOGIN ================= */
 window.login = async () => {
-  const email = document.getElementById('email').value;
+  const email = document.getElementById('email').value.trim();
   const pass = document.getElementById('pass').value;
+
+  if(!email || !pass){
+    alert("❗ Email & Password লাগবে");
+    return;
+  }
 
   try {
     await signInWithEmailAndPassword(auth, email, pass);
-    alert("Login Success ✅");
+    alert("✅ Login Success");
   } catch(e){
     console.error(e);
-    alert("Login Error: " + e.message);
+    alert("❌ Login Error: " + e.message);
   }
 };
 
-/* 🔓 LOGOUT */
-window.logout = () => {
-  signOut(auth);
+/* ================= LOGOUT ================= */
+window.logout = async () => {
+  await signOut(auth);
   location.reload();
 };
 
-/* 🔍 AUTH CHECK */
+/* ================= AUTH CHECK ================= */
 onAuthStateChanged(auth, async (user) => {
-  console.log("Auth Changed:", user);
+  console.log("User:", user);
 
   if(user){
-    const snap = await get(ref(db, "users/" + user.uid));
+    try{
+      const snap = await get(ref(db, "users/" + user.uid));
 
-    if(!snap.exists() || snap.val().isAdmin !== true){
-      alert("❌ তুমি Admin না!");
-      logout();
-      return;
+      if(!snap.exists() || snap.val().isAdmin !== true){
+        alert("❌ তুমি Admin না!");
+        logout();
+        return;
+      }
+
+      document.getElementById('loginBox').style.display = "none";
+      document.getElementById('adminPanel').style.display = "block";
+
+      loadData();
+
+    }catch(e){
+      console.error(e);
+      alert("Admin Check Error");
     }
-
-    /* ✅ Show Admin Panel */
-    document.getElementById('loginBox').style.display = "none";
-    document.getElementById('adminPanel').style.display = "block";
-
-    loadData();
   }
 });
 
-/* 📥 LOAD SUBMISSIONS */
+/* ================= LOAD DATA ================= */
 function loadData(){
   onValue(ref(db, "submissions"), (snap) => {
     const list = document.getElementById('list');
     list.innerHTML = "";
 
     if(!snap.exists()){
-      list.innerHTML = "<p>No Data</p>";
+      list.innerHTML = "<p class='text-center'>No submissions</p>";
       return;
     }
 
@@ -113,19 +127,27 @@ function loadData(){
       const key = child.key;
 
       list.innerHTML += `
-      <div class="card p-3 mb-3">
-        <b>User:</b> ${d.username || "N/A"} <br>
-        <b>Total:</b> ${d.totalAmount || 0} <br>
-        <b>Status:</b> ${d.status || "pending"} <br><br>
+      <div class="card p-3 mb-3 shadow-sm">
+        <div><b>User:</b> ${d.username || "N/A"}</div>
+        <div><b>Total:</b> ${d.totalAmount || 0}</div>
+        <div><b>Status:</b> 
+          <span style="color:${getStatusColor(d.status)}">
+            ${d.status || "pending"}
+          </span>
+        </div>
 
-        <button class="btn btn-success btn-sm"
+        <hr>
+
+        <button 
+          class="btn btn-success btn-sm me-2"
           onclick="approve('${key}','${d.userId}',${d.totalAmount})">
-          Approve
+          ✅ Approve
         </button>
 
-        <button class="btn btn-danger btn-sm"
+        <button 
+          class="btn btn-danger btn-sm"
           onclick="reject('${key}','${d.userId}',${d.totalAmount})">
-          Reject
+          ❌ Reject
         </button>
       </div>
       `;
@@ -133,11 +155,28 @@ function loadData(){
   });
 }
 
-/* ✅ APPROVE */
+/* ================= STATUS COLOR ================= */
+function getStatusColor(status){
+  if(status === "approved") return "green";
+  if(status === "rejected") return "red";
+  return "orange";
+}
+
+/* ================= APPROVE ================= */
 window.approve = async (id, uid, amount) => {
+
+  if(isProcessing) return;
+  isProcessing = true;
+
   try{
     const userRef = ref(db, "users/" + uid);
     const snap = await get(userRef);
+
+    if(!snap.exists()){
+      alert("User not found!");
+      isProcessing = false;
+      return;
+    }
 
     let balance = snap.val().balance || 0;
     let hold = snap.val().hold || 0;
@@ -148,22 +187,34 @@ window.approve = async (id, uid, amount) => {
 
     await update(userRef, {
       balance: balance + amount,
-      hold: hold - amount
+      hold: Math.max(0, hold - amount)
     });
 
-    alert("Approved ✅");
+    alert("✅ Approved");
 
   }catch(e){
     console.error(e);
-    alert("Approve Error: " + e.message);
+    alert("❌ Approve Error");
   }
+
+  isProcessing = false;
 };
 
-/* ❌ REJECT */
+/* ================= REJECT ================= */
 window.reject = async (id, uid, amount) => {
+
+  if(isProcessing) return;
+  isProcessing = true;
+
   try{
     const userRef = ref(db, "users/" + uid);
     const snap = await get(userRef);
+
+    if(!snap.exists()){
+      alert("User not found!");
+      isProcessing = false;
+      return;
+    }
 
     let hold = snap.val().hold || 0;
 
@@ -172,19 +223,20 @@ window.reject = async (id, uid, amount) => {
     });
 
     await update(userRef, {
-      hold: hold - amount
+      hold: Math.max(0, hold - amount)
     });
 
-    alert("Rejected ❌");
+    alert("❌ Rejected");
 
   }catch(e){
     console.error(e);
-    alert("Reject Error: " + e.message);
+    alert("Reject Error");
   }
+
+  isProcessing = false;
 };
 
 </script>
-
 
 </body>
 </html>
