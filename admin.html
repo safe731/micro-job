@@ -40,7 +40,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* 🔥 তোমার Firebase config বসাও */
+/* 🔥 Firebase Config */
 const firebaseConfig = {
   apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
   authDomain: "mail-fact.firebaseapp.com",
@@ -51,41 +51,45 @@ const firebaseConfig = {
   appId: "1:800577449702:web:0576286f40bfac40451527"
 };
 
-
+/* 🔥 Init */
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-window.loginAdmin = async function(){
-  const email = document.getElementById("email").value;
-  const pass = document.getElementById("password").value;
+/* 🔐 LOGIN */
+window.login = async () => {
+  const email = document.getElementById('email').value;
+  const pass = document.getElementById('pass').value;
 
-  try{
-    const userCred = await signInWithEmailAndPassword(auth, email, pass);
-
-    alert("Login Success");
-
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("adminPanel").style.display = "block";
-
-  }catch(e){
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    alert("Login Success ✅");
+  } catch(e){
     console.error(e);
     alert("Login Error: " + e.message);
   }
 };
 
-window.logout = () => signOut(auth);
+/* 🔓 LOGOUT */
+window.logout = () => {
+  signOut(auth);
+  location.reload();
+};
 
+/* 🔍 AUTH CHECK */
 onAuthStateChanged(auth, async (user) => {
+  console.log("Auth Changed:", user);
+
   if(user){
     const snap = await get(ref(db, "users/" + user.uid));
 
     if(!snap.exists() || snap.val().isAdmin !== true){
-      alert("Not Admin!");
+      alert("❌ তুমি Admin না!");
       logout();
       return;
     }
 
+    /* ✅ Show Admin Panel */
     document.getElementById('loginBox').style.display = "none";
     document.getElementById('adminPanel').style.display = "block";
 
@@ -93,10 +97,16 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
+/* 📥 LOAD SUBMISSIONS */
 function loadData(){
   onValue(ref(db, "submissions"), (snap) => {
     const list = document.getElementById('list');
     list.innerHTML = "";
+
+    if(!snap.exists()){
+      list.innerHTML = "<p>No Data</p>";
+      return;
+    }
 
     snap.forEach(child => {
       const d = child.val();
@@ -104,55 +114,77 @@ function loadData(){
 
       list.innerHTML += `
       <div class="card p-3 mb-3">
-        <b>User:</b> ${d.username} <br>
-        <b>Total:</b> ${d.totalAmount} <br>
-        <b>Status:</b> ${d.status} <br><br>
+        <b>User:</b> ${d.username || "N/A"} <br>
+        <b>Total:</b> ${d.totalAmount || 0} <br>
+        <b>Status:</b> ${d.status || "pending"} <br><br>
 
-        <button class="btn btn-success btn-sm" onclick="approve('${key}','${d.userId}',${d.totalAmount})">Approve</button>
-        <button class="btn btn-danger btn-sm" onclick="reject('${key}','${d.userId}',${d.totalAmount})">Reject</button>
+        <button class="btn btn-success btn-sm"
+          onclick="approve('${key}','${d.userId}',${d.totalAmount})">
+          Approve
+        </button>
+
+        <button class="btn btn-danger btn-sm"
+          onclick="reject('${key}','${d.userId}',${d.totalAmount})">
+          Reject
+        </button>
       </div>
       `;
     });
   });
 }
 
+/* ✅ APPROVE */
 window.approve = async (id, uid, amount) => {
-  const userRef = ref(db, "users/" + uid);
-  const snap = await get(userRef);
+  try{
+    const userRef = ref(db, "users/" + uid);
+    const snap = await get(userRef);
 
-  let balance = snap.val().balance || 0;
-  let hold = snap.val().hold || 0;
+    let balance = snap.val().balance || 0;
+    let hold = snap.val().hold || 0;
 
-  await update(ref(db, "submissions/" + id), {
-    status: "approved"
-  });
+    await update(ref(db, "submissions/" + id), {
+      status: "approved"
+    });
 
-  await update(userRef, {
-    balance: balance + amount,
-    hold: hold - amount
-  });
+    await update(userRef, {
+      balance: balance + amount,
+      hold: hold - amount
+    });
 
-  alert("Approved ✅");
+    alert("Approved ✅");
+
+  }catch(e){
+    console.error(e);
+    alert("Approve Error: " + e.message);
+  }
 };
 
+/* ❌ REJECT */
 window.reject = async (id, uid, amount) => {
-  const userRef = ref(db, "users/" + uid);
-  const snap = await get(userRef);
+  try{
+    const userRef = ref(db, "users/" + uid);
+    const snap = await get(userRef);
 
-  let hold = snap.val().hold || 0;
+    let hold = snap.val().hold || 0;
 
-  await update(ref(db, "submissions/" + id), {
-    status: "rejected"
-  });
+    await update(ref(db, "submissions/" + id), {
+      status: "rejected"
+    });
 
-  await update(userRef, {
-    hold: hold - amount
-  });
+    await update(userRef, {
+      hold: hold - amount
+    });
 
-  alert("Rejected ❌");
+    alert("Rejected ❌");
+
+  }catch(e){
+    console.error(e);
+    alert("Reject Error: " + e.message);
+  }
 };
 
 </script>
+
 
 </body>
 </html>
