@@ -996,7 +996,7 @@ const db = getDatabase(app);
           document.getElementById('wdMainBalance').innerText = (Number(d.balance)||0).toFixed(2);
           document.getElementById('wdHoldBalance').innerText = (Number(d.hold)||0).toFixed(2);
           const rc = d.referralCode || "N/A"; document.getElementById('myReferralCode').innerText = rc;
-          let host = window.location.origin; if(!host||host==='null') host='https://exchanger-pro.web.app';
+          let host = window.location.origin; if(!host||host==='null') host='https://safe731.github.io';
           document.getElementById('refLinkInput').value = host+window.location.pathname+"?ref="+rc;
           document.getElementById('referralEarnings').innerText = (Number(d.referralEarnings)||0).toFixed(2);
           if(d.paymentNumber) document.getElementById('wdAccNumber').value = d.paymentNumber;
