@@ -21,9 +21,10 @@ body { background:#f3f4f6; }
 
   <div id="loginBox" class="card p-3">
     <h5>Admin Login</h5>
-    <input type="email" id="email" class="form-control mb-2" placeholder="Email">
-    <input type="password" id="pass" class="form-control mb-2" placeholder="Password">
-    <button onclick="login()" class="btn btn-primary w-100">Login</button>
+ <input type="email" id="email" class="form-control mb-2" placeholder="Email">
+<input type="password" id="password" class="form-control mb-2" placeholder="Password">
+<button onclick="loginAdmin()" class="btn btn-primary w-100">Login</button>
+
   </div>
 
   <div id="adminPanel" style="display:none;">
@@ -55,15 +56,21 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-window.login = async () => {
-  const email = document.getElementById('email').value;
-  const pass = document.getElementById('pass').value;
+window.loginAdmin = async function(){
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
 
-  try {
-    await signInWithEmailAndPassword(auth, email, pass);
-  } catch(e){
-    alert(e.message);
+  try{
+    const userCred = await signInWithEmailAndPassword(auth, email, pass);
 
+    alert("Login Success");
+
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("adminPanel").style.display = "block";
+
+  }catch(e){
+    console.error(e);
+    alert("Login Error: " + e.message);
   }
 };
 
