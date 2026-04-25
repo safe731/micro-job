@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-3">
+
+<h3>📊 Admin Panel - Submissions</h3>
+
+<div id="submissionList"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  databaseURL: "YOUR_DB_URL",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const list = document.getElementById("submissionList");
+
+onValue(ref(db, "submissions"), (snap) => {
+  list.innerHTML = "";
+
+  snap.forEach(child => {
+    const data = child.val();
+    const id = child.key;
+
+    list.innerHTML += `
+      <div class="card p-2 mb-2">
+        <b>User:</b> ${data.username} <br>
+        <b>Total:</b> ${data.totalAmount} ৳ <br>
+        <b>Status:</b> ${data.status} <br><br>
+
+        <button onclick="approve('${id}','${data.userId}',${data.totalAmount})" class="btn btn-success btn-sm">Approve</button>
+        <button onclick="reject('${id}','${data.userId}',${data.totalAmount})" class="btn btn-danger btn-sm">Reject</button>
+      </div>
+    `;
+  });
+});
+
+window.approve = async (id, userId, amount) => {
+  const userRef = ref(db, 'users/' + userId);
+
+  const snap = await get(userRef);
+  const user = snap.val();
+
+  // balance update
+  await update(userRef, {
+    balance: (user.balance || 0) + amount,
+    hold: (user.hold || 0) - amount
+  });
+
+  // submission status update
+  await update(ref(db, 'submissions/' + id), {
+    status: "approved"
+  });
+
+  alert("Approved ✅");
+};
+
+window.reject = async (id, userId, amount) => {
+  const userRef = ref(db, 'users/' + userId);
+
+  const snap = await get(userRef);
+  const user = snap.val();
+
+  // hold থেকে remove
+  await update(userRef, {
+    hold: (user.hold || 0) - amount
+  });
+
+  await update(ref(db, 'submissions/' + id), {
+    status: "rejected"
+  });
+
+  alert("Rejected ❌");
+};
+</script>
+
+</body>
+</html>
