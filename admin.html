@@ -62,7 +62,8 @@ window.login = async () => {
   try {
     await signInWithEmailAndPassword(auth, email, pass);
   } catch(e){
-    alert("Login Failed");
+    alert(e.message);
+
   }
 };
 
