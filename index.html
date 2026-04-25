@@ -759,17 +759,18 @@ document.addEventListener('DOMContentLoaded', function() {
 const firebaseConfig = {
   apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
   authDomain: "mail-fact.firebaseapp.com",
-  databaseURL: "https://mail-fact-default-rtdb.firebaseio.com",
+  databaseURL: "https://mail-fact-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "mail-fact",
   storageBucket: "mail-fact.firebasestorage.app",
   messagingSenderId: "800577449702",
-  appId: "1:800577449702:web:0576286f40bfac40451527"
+  appId: "1:800577449702:web:0576286f40bfac40451527",
+  measurementId: "G-YDJKH34TVH"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-
 
   window.currentUser = null;
   window.isAppReady = false; 
