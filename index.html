@@ -1185,8 +1185,8 @@ const firebaseConfig = {
 </script>
 
 <script>
-    const validTabs = ['home','history','sellers','profile','exchange_step'];
-
+    
+    const validTabs = ['micro-job/home','micro-job/history','micro-job/sellers','micro-job/profile','micro-job/exchange_step'];
     function switchTab(tabId, pushState = true) {
         if (!validTabs.includes(tabId)) tabId = 'home';
         document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
