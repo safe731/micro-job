@@ -24,10 +24,14 @@ body { background:#f3f4f6; }
     <h5>Admin Login</h5>
     <input type="email" id="email" class="form-control mb-2" placeholder="Email">
     <input type="password" id="password" class="form-control mb-2" placeholder="Password">
-    <button onclick="login()" class="btn btn-primary w-100">Login</button>
+    <!--button onclick="login()" class="btn btn-primary w-100">Login</button-->    
+    <button id="loginBtn" class="btn btn-primary w-100">Login</button>
+
   </div>
 
   <!-- ADMIN PANEL -->
+
+  
   <div id="adminPanel" style="display:none;">
     <button onclick="logout()" class="btn btn-danger mb-3">Logout</button>
     <div id="list"></div>
