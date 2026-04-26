@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="stylesheet" href="admin.css">
+
   <title>Admin Panel</title>
   <script type="module">
 
@@ -72,12 +74,16 @@ onValue(ref(db, "withdraw_requests"), (snap) => {
     const data = child.val();
 
     box.innerHTML += `
-      <div style="border:1px solid red; padding:10px; margin:10px">
-        <b>${data.username}</b><br>
-        ${data.amount} BDT<br>
-        <button onclick="approveW('${child.key}', '${data.userId}', ${data.amount})">Approve</button>
-      </div>
-    `;
+  <div class="card">
+    <b>User:</b> ${data.username}<br>
+    <b>Amount:</b> ${data.totalAmount}<br>
+    <span class="status ${data.status}">${data.status}</span><br>
+
+    <button class="btn btn-approve" onclick="approve('${child.key}')">Approve</button>
+    <button class="btn btn-reject" onclick="reject('${child.key}')">Reject</button>
+  </div>
+`;
+
   });
 });
 
@@ -90,6 +96,8 @@ window.approveW = (id, uid, amount) => {
   update(ref(db), updates);
 };
 
+
+
   </script>
 </head>
 
@@ -101,5 +109,7 @@ window.approveW = (id, uid, amount) => {
 
   <h3>Withdraw Requests</h3>
   <div id="withdraws"></div>
+  
+
 </body>
 </html>
