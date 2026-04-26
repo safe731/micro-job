@@ -121,14 +121,16 @@ function showAdmin(){
 
 /* ================= LOAD DATA ================= */
 function loadData(){
+  console.log("🔥 loadData started");
+
+  const list = document.getElementById('list');
 
   onValue(ref(db, "submissions"), (snap) => {
 
-    const list = document.getElementById('list');
     list.innerHTML = "";
 
     if(!snap.exists()){
-      list.innerHTML = "<p class='text-center'>No submissions</p>";
+      list.innerHTML = "<h5 style='text-align:center'>No Data Found 🚫</h5>";
       return;
     }
 
@@ -136,33 +138,39 @@ function loadData(){
       const d = child.val();
       const key = child.key;
 
-      list.innerHTML += `
-      <div class="card p-3 mb-3 shadow-sm">
+      console.log("Item:", d);
+
+      const div = document.createElement("div");
+      div.className = "card p-3 mb-3 shadow-sm";
+
+      div.innerHTML = `
         <div><b>User:</b> ${d.username || "N/A"}</div>
         <div><b>Total:</b> ${d.totalAmount || 0}</div>
-        <div><b>Status:</b> 
-          <span style="color:${getStatusColor(d.status)}">
-            ${d.status || "pending"}
-          </span>
-        </div>
-
+        <div><b>Status:</b> ${d.status || "pending"}</div>
         <hr>
 
-        <button class="btn btn-success btn-sm me-2"
-          onclick="approve('${key}','${d.userId}',${d.totalAmount || 0})">
-          ✅ Approve
+        <button class="btn btn-success btn-sm me-2">
+          Approve
         </button>
 
-        <button class="btn btn-danger btn-sm"
-          onclick="reject('${key}','${d.userId}',${d.totalAmount || 0})">
-          ❌ Reject
+        <button class="btn btn-danger btn-sm">
+          Reject
         </button>
-      </div>
       `;
+
+      // buttons event
+      div.querySelector(".btn-success").onclick = () =>
+        approve(key, d.userId, d.totalAmount);
+
+      div.querySelector(".btn-danger").onclick = () =>
+        reject(key, d.userId, d.totalAmount);
+
+      list.appendChild(div);
     });
 
   });
 }
+
 
 /* ================= STATUS COLOR ================= */
 function getStatusColor(status){
