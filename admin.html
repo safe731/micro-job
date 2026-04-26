@@ -71,10 +71,9 @@ window.login = async () => {
 
   try {
     const userCred = await signInWithEmailAndPassword(auth, email, pass);
-
     const user = userCred.user;
 
-    // 🔥 ADMIN CHECK এখানেই করো
+    // 🔥 ADMIN CHECK
     const snap = await get(ref(db, "users/" + user.uid));
 
     if(!snap.exists() || snap.val().isAdmin !== true){
@@ -83,7 +82,7 @@ window.login = async () => {
       return;
     }
 
-    // 🔥 UI CHANGE এখানেই
+    // 🔥 UI SHOW
     document.getElementById('loginBox').style.display = "none";
     document.getElementById('adminPanel').style.display = "block";
 
@@ -95,26 +94,44 @@ window.login = async () => {
   }
 };
 
-  
 /* ================= LOGOUT ================= */
 window.logout = async () => {
   await signOut(auth);
   location.reload();
 };
 
-/* ================= AUTH CHECK ================= */
+/* ================= AUTO LOGIN CHECK ================= */
+onAuthStateChanged(auth, async (user) => {
 
-onAuthStateChanged(auth, (user) => {
   if(user){
-    document.getElementById('loginBox').style.display = "none";
-    document.getElementById('adminPanel').style.display = "block";
+    try{
+      const snap = await get(ref(db, "users/" + user.uid));
+
+      if(!snap.exists() || snap.val().isAdmin !== true){
+        await signOut(auth);
+        return;
+      }
+
+      document.getElementById('loginBox').style.display = "none";
+      document.getElementById('adminPanel').style.display = "block";
+
+      loadData();
+
+    }catch(e){
+      console.error(e);
+    }
   }
 });
 
-
 /* ================= LOAD DATA ================= */
 function loadData(){
-  onValue(ref(db, "submissions"), (snap) => {
+
+  const submissionsRef = ref(db, "submissions");
+
+  onValue(submissionsRef, (snap) => {
+
+    console.log("DATA:", snap.val()); // 🔥 debug
+
     const list = document.getElementById('list');
     list.innerHTML = "";
 
@@ -141,18 +158,19 @@ function loadData(){
 
         <button 
           class="btn btn-success btn-sm me-2"
-          onclick="approve('${key}','${d.userId}',${d.totalAmount})">
+          onclick="approve('${key}','${d.userId}',${d.totalAmount || 0})">
           ✅ Approve
         </button>
 
         <button 
           class="btn btn-danger btn-sm"
-          onclick="reject('${key}','${d.userId}',${d.totalAmount})">
+          onclick="reject('${key}','${d.userId}',${d.totalAmount || 0})">
           ❌ Reject
         </button>
       </div>
       `;
     });
+
   });
 }
 
@@ -231,7 +249,7 @@ window.reject = async (id, uid, amount) => {
 
   }catch(e){
     console.error(e);
-    alert("Reject Error");
+    alert("❌ Reject Error");
   }
 
   isProcessing = false;
