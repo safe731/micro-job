@@ -38,14 +38,18 @@ body { background:#f3f4f6; }
   </div>
 </div>
 
+
+
+
+
+
+
 <script type="module">
 
-/* ================= FIREBASE ================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getDatabase, ref, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* ================= CONFIG ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
   authDomain: "mail-fact.firebaseapp.com",
@@ -56,18 +60,15 @@ const firebaseConfig = {
   appId: "1:800577449702:web:0576286f40bfac40451527"
 };
 
-/* ================= INIT ================= */
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-let isProcessing = false;
-
-/* ================= LOGIN ================= */
+/* 🔥 LOGIN BUTTON FIX */
 document.getElementById("loginBtn").addEventListener("click", async () => {
 
-  const email = document.getElementById('email').value.trim();
-  const pass = document.getElementById('password').value;
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
 
   if(!email || !pass){
     alert("Email & Password required!");
@@ -87,149 +88,91 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
       return;
     }
 
-    // 🔥 FORCE SHOW PANEL
-    document.getElementById('loginBox').style.display = "none";
-    document.getElementById('adminPanel').style.display = "block";
+    // ✅ SHOW PANEL
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("adminPanel").style.display = "block";
 
     loadData();
 
   } catch(e){
-    console.error(e);
-    alert("Login Error: " + e.message);
+    alert(e.message);
   }
 
 });
 
-/* ================= LOGOUT ================= */
+/* LOGOUT */
 window.logout = async () => {
   await signOut(auth);
   location.reload();
 };
 
-/* ================= AUTO LOGIN ================= */
-onAuthStateChanged(auth, async (user) => {
-  if(user){
-    const snap = await get(ref(db, "users/" + user.uid));
-
-    if(snap.exists() && snap.val().isAdmin === true){
-      document.getElementById('loginBox').style.display = "none";
-      document.getElementById('adminPanel').style.display = "block";
-      loadData();
-    }
-  }
-});
-
-/* ================= LOAD DATA ================= */
+/* LOAD DATA */
 function loadData(){
   onValue(ref(db, "submissions"), (snap) => {
 
-    const list = document.getElementById('list');
+    const list = document.getElementById("list");
     list.innerHTML = "";
 
     if(!snap.exists()){
-      list.innerHTML = "<p class='text-center'>No submissions</p>";
+      list.innerHTML = "<h5>No Data</h5>";
       return;
     }
 
     snap.forEach(child => {
-
       const d = child.val();
       const key = child.key;
 
       list.innerHTML += `
-      <div class="card p-3 mb-3 shadow-sm">
-        <div><b>User:</b> ${d.username || "N/A"}</div>
-        <div><b>Total:</b> ${d.totalAmount || 0}</div>
-        <div><b>Status:</b> ${d.status || "pending"}</div>
+        <div class="card p-3 mb-2">
+          <b>${d.username}</b><br>
+          Amount: ${d.totalAmount}<br>
+          Status: ${d.status}<br><br>
 
-        <hr>
-
-        <button 
-          class="btn btn-success btn-sm me-2"
-          onclick="approve('${key}','${d.userId}',${d.totalAmount || 0})">
-          Approve
-        </button>
-
-        <button 
-          class="btn btn-danger btn-sm"
-          onclick="reject('${key}','${d.userId}',${d.totalAmount || 0})">
-          Reject
-        </button>
-      </div>
+          <button onclick="approve('${key}','${d.userId}',${d.totalAmount})" class="btn btn-success btn-sm">Approve</button>
+          <button onclick="reject('${key}','${d.userId}',${d.totalAmount})" class="btn btn-danger btn-sm">Reject</button>
+        </div>
       `;
     });
 
   });
 }
 
-/* ================= APPROVE ================= */
+/* APPROVE */
 window.approve = async (id, uid, amount) => {
+  const userRef = ref(db, "users/" + uid);
+  const snap = await get(userRef);
 
-  if(isProcessing) return;
-  isProcessing = true;
+  let balance = snap.val().balance || 0;
+  let hold = snap.val().hold || 0;
 
-  try{
-    const userRef = ref(db, "users/" + uid);
-    const snap = await get(userRef);
+  await update(ref(db, "submissions/" + id), { status: "approved" });
 
-    let balance = snap.val().balance || 0;
-    let hold = snap.val().hold || 0;
+  await update(userRef, {
+    balance: balance + amount,
+    hold: hold - amount
+  });
 
-    await update(ref(db, "submissions/" + id), {
-      status: "approved"
-    });
-
-    await update(userRef, {
-      balance: balance + amount,
-      hold: Math.max(0, hold - amount)
-    });
-
-    alert("Approved");
-
-  }catch(e){
-    console.error(e);
-    alert("Approve Error");
-  }
-
-  isProcessing = false;
+  alert("Approved");
 };
 
-/* ================= REJECT ================= */
+/* REJECT */
 window.reject = async (id, uid, amount) => {
+  const userRef = ref(db, "users/" + uid);
+  const snap = await get(userRef);
 
-  if(isProcessing) return;
-  isProcessing = true;
+  let hold = snap.val().hold || 0;
 
-  try{
-    const userRef = ref(db, "users/" + uid);
-    const snap = await get(userRef);
+  await update(ref(db, "submissions/" + id), { status: "rejected" });
 
-    let hold = snap.val().hold || 0;
+  await update(userRef, {
+    hold: hold - amount
+  });
 
-    await update(ref(db, "submissions/" + id), {
-      status: "rejected"
-    });
-
-    await update(userRef, {
-      hold: Math.max(0, hold - amount)
-    });
-
-    alert("Rejected");
-
-  }catch(e){
-    console.error(e);
-    alert("Reject Error");
-  }
-
-  isProcessing = false;
+  alert("Rejected");
 };
 
-window.addEventListener("load", () => {
-  console.log("Page Loaded");
-});
-
-  
 </script>
 
+  
 </body>
 </html>
