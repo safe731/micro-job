@@ -60,7 +60,8 @@ const db = getDatabase(app);
 let isProcessing = false;
 
 /* ================= LOGIN ================= */
-window.login = async () => {
+document.getElementById("loginBtn").addEventListener("click", async () => {
+
   const email = document.getElementById('email').value.trim();
   const pass = document.getElementById('password').value;
 
@@ -73,16 +74,16 @@ window.login = async () => {
     const userCred = await signInWithEmailAndPassword(auth, email, pass);
     const user = userCred.user;
 
-    // ✅ Admin check
+    console.log("UID:", user.uid);
+
     const snap = await get(ref(db, "users/" + user.uid));
 
     if(!snap.exists() || snap.val().isAdmin !== true){
-      alert("❌ Not Admin!");
-      await signOut(auth);
+      alert("❌ তুমি Admin না!");
       return;
     }
 
-    // ✅ UI show
+    // 🔥 FORCE SHOW PANEL
     document.getElementById('loginBox').style.display = "none";
     document.getElementById('adminPanel').style.display = "block";
 
@@ -92,7 +93,8 @@ window.login = async () => {
     console.error(e);
     alert("Login Error: " + e.message);
   }
-};
+
+});
 
 /* ================= LOGOUT ================= */
 window.logout = async () => {
