@@ -86,12 +86,27 @@ window.logout = async () => {
 };
 
 /* ================= AUTH CHECK ================= */
-onAuthStateChanged(auth, (user) => {
-  if(user){
-    document.getElementById('loginBox').style.display = "none";
-    document.getElementById('adminPanel').style.display = "block";
+onAuthStateChanged(auth, async (user) => {
 
-    loadData();
+  if(user){
+    try{
+      const snap = await get(ref(db, "users/" + user.uid));
+
+      if(!snap.exists() || snap.val().isAdmin !== true){
+        alert("❌ তুমি Admin না!");
+        logout();
+        return;
+      }
+
+      document.getElementById('loginBox').style.display = "none";
+      document.getElementById('adminPanel').style.display = "block";
+
+      loadData();
+
+    }catch(e){
+      console.error(e);
+      alert("Admin Check Error");
+    }
   }
 });
 
