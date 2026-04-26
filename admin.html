@@ -70,7 +70,9 @@ window.login = async () => {
   }
 
   try {
-    await signInWithEmailAndPassword(auth, email, pass);
+ await signInWithEmailAndPassword(auth, email, pass);
+alert("✅ Login Success");
+
   } catch(e){
     console.error(e);
     alert("❌ Login Error: " + e.message);
