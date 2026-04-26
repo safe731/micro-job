@@ -24,12 +24,12 @@ body { background:#f3f4f6; }
     <h5>Admin Login</h5>
     <input type="email" id="email" class="form-control mb-2" placeholder="Email">
     <input type="password" id="password" class="form-control mb-2" placeholder="Password">
-    <button id="loginBtn" class="btn btn-primary w-100">Login</button>
+    <button onclick="login()" class="btn btn-primary w-100">Login</button>
   </div>
 
   <!-- ADMIN PANEL -->
   <div id="adminPanel" style="display:none;">
-    <button id="logoutBtn" class="btn btn-danger mb-3">Logout</button>
+    <button onclick="logout()" class="btn btn-danger mb-3">Logout</button>
     <div id="list"></div>
   </div>
 </div>
@@ -59,17 +59,13 @@ const db = getDatabase(app);
 
 let isProcessing = false;
 
-/* ================= BUTTON EVENTS ================= */
-document.getElementById("loginBtn").addEventListener("click", login);
-document.getElementById("logoutBtn").addEventListener("click", logout);
-
 /* ================= LOGIN ================= */
-async function login() {
+window.login = async () => {
   const email = document.getElementById('email').value.trim();
   const pass = document.getElementById('password').value;
 
   if(!email || !pass){
-    alert("❗ Email & Password লাগবে");
+    alert("Email & Password required!");
     return;
   }
 
@@ -77,106 +73,87 @@ async function login() {
     const userCred = await signInWithEmailAndPassword(auth, email, pass);
     const user = userCred.user;
 
+    // ✅ Admin check
     const snap = await get(ref(db, "users/" + user.uid));
 
     if(!snap.exists() || snap.val().isAdmin !== true){
-      alert("❌ তুমি Admin না!");
+      alert("❌ Not Admin!");
       await signOut(auth);
       return;
     }
 
-    showAdmin();
+    // ✅ UI show
+    document.getElementById('loginBox').style.display = "none";
+    document.getElementById('adminPanel').style.display = "block";
+
     loadData();
 
   } catch(e){
     console.error(e);
-    alert("❌ Login Error: " + e.message);
+    alert("Login Error: " + e.message);
   }
-}
+};
 
 /* ================= LOGOUT ================= */
-async function logout() {
+window.logout = async () => {
   await signOut(auth);
   location.reload();
-}
+};
 
 /* ================= AUTO LOGIN ================= */
 onAuthStateChanged(auth, async (user) => {
-
   if(user){
     const snap = await get(ref(db, "users/" + user.uid));
 
     if(snap.exists() && snap.val().isAdmin === true){
-      showAdmin();
+      document.getElementById('loginBox').style.display = "none";
+      document.getElementById('adminPanel').style.display = "block";
       loadData();
     }
   }
 });
 
-/* ================= SHOW PANEL ================= */
-function showAdmin(){
-  document.getElementById('loginBox').style.display = "none";
-  document.getElementById('adminPanel').style.display = "block";
-}
-
 /* ================= LOAD DATA ================= */
 function loadData(){
-  console.log("🔥 loadData started");
-
-  const list = document.getElementById('list');
-
   onValue(ref(db, "submissions"), (snap) => {
 
+    const list = document.getElementById('list');
     list.innerHTML = "";
 
     if(!snap.exists()){
-      list.innerHTML = "<h5 style='text-align:center'>No Data Found 🚫</h5>";
+      list.innerHTML = "<p class='text-center'>No submissions</p>";
       return;
     }
 
     snap.forEach(child => {
+
       const d = child.val();
       const key = child.key;
 
-      console.log("Item:", d);
-
-      const div = document.createElement("div");
-      div.className = "card p-3 mb-3 shadow-sm";
-
-      div.innerHTML = `
+      list.innerHTML += `
+      <div class="card p-3 mb-3 shadow-sm">
         <div><b>User:</b> ${d.username || "N/A"}</div>
         <div><b>Total:</b> ${d.totalAmount || 0}</div>
         <div><b>Status:</b> ${d.status || "pending"}</div>
+
         <hr>
 
-        <button class="btn btn-success btn-sm me-2">
+        <button 
+          class="btn btn-success btn-sm me-2"
+          onclick="approve('${key}','${d.userId}',${d.totalAmount || 0})">
           Approve
         </button>
 
-        <button class="btn btn-danger btn-sm">
+        <button 
+          class="btn btn-danger btn-sm"
+          onclick="reject('${key}','${d.userId}',${d.totalAmount || 0})">
           Reject
         </button>
+      </div>
       `;
-
-      // buttons event
-      div.querySelector(".btn-success").onclick = () =>
-        approve(key, d.userId, d.totalAmount);
-
-      div.querySelector(".btn-danger").onclick = () =>
-        reject(key, d.userId, d.totalAmount);
-
-      list.appendChild(div);
     });
 
   });
-}
-
-
-/* ================= STATUS COLOR ================= */
-function getStatusColor(status){
-  if(status === "approved") return "green";
-  if(status === "rejected") return "red";
-  return "orange";
 }
 
 /* ================= APPROVE ================= */
@@ -201,11 +178,11 @@ window.approve = async (id, uid, amount) => {
       hold: Math.max(0, hold - amount)
     });
 
-    alert("✅ Approved");
+    alert("Approved");
 
   }catch(e){
     console.error(e);
-    alert("❌ Approve Error");
+    alert("Approve Error");
   }
 
   isProcessing = false;
@@ -231,11 +208,11 @@ window.reject = async (id, uid, amount) => {
       hold: Math.max(0, hold - amount)
     });
 
-    alert("❌ Rejected");
+    alert("Rejected");
 
   }catch(e){
     console.error(e);
-    alert("❌ Reject Error");
+    alert("Reject Error");
   }
 
   isProcessing = false;
