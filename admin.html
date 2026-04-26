@@ -89,26 +89,28 @@ window.logout = async () => {
 onAuthStateChanged(auth, async (user) => {
 
   if(user){
-    try{
-      const snap = await get(ref(db, "users/" + user.uid));
+    console.log("UID:", user.uid);
 
-      if(!snap.exists() || snap.val().isAdmin !== true){
-        alert("❌ তুমি Admin না!");
-        logout();
-        return;
-      }
+    const snap = await get(ref(db, "users/" + user.uid));
+    console.log("DB:", snap.val());
 
-      document.getElementById('loginBox').style.display = "none";
-      document.getElementById('adminPanel').style.display = "block";
-
-      loadData();
-
-    }catch(e){
-      console.error(e);
-      alert("Admin Check Error");
+    if(!snap.exists()){
+      alert("❌ User data নাই database এ");
+      return;
     }
+
+    if(snap.val().isAdmin !== true){
+      alert("❌ Admin না!");
+      return;
+    }
+
+    document.getElementById('loginBox').style.display = "none";
+    document.getElementById('adminPanel').style.display = "block";
+
+    loadData();
   }
 });
+
 
 /* ================= LOAD DATA ================= */
 function loadData(){
