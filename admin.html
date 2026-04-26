@@ -86,30 +86,15 @@ window.logout = async () => {
 };
 
 /* ================= AUTH CHECK ================= */
-onAuthStateChanged(auth, async (user) => {
-
+onAuthStateChanged(auth, (user) => {
   if(user){
-    console.log("UID:", user.uid);
-
-    const snap = await get(ref(db, "users/" + user.uid));
-    console.log("DB:", snap.val());
-
-    if(!snap.exists()){
-      alert("❌ User data নাই database এ");
-      return;
-    }
-
-    if(snap.val().isAdmin !== true){
-      alert("❌ Admin না!");
-      return;
-    }
-
     document.getElementById('loginBox').style.display = "none";
     document.getElementById('adminPanel').style.display = "block";
 
     loadData();
   }
 });
+
 
 
 /* ================= LOAD DATA ================= */
