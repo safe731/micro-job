@@ -70,8 +70,24 @@ window.login = async () => {
   }
 
   try {
- await signInWithEmailAndPassword(auth, email, pass);
-alert("✅ Login Success");
+    const userCred = await signInWithEmailAndPassword(auth, email, pass);
+
+    const user = userCred.user;
+
+    // 🔥 ADMIN CHECK এখানেই করো
+    const snap = await get(ref(db, "users/" + user.uid));
+
+    if(!snap.exists() || snap.val().isAdmin !== true){
+      alert("❌ তুমি Admin না!");
+      await signOut(auth);
+      return;
+    }
+
+    // 🔥 UI CHANGE এখানেই
+    document.getElementById('loginBox').style.display = "none";
+    document.getElementById('adminPanel').style.display = "block";
+
+    loadData();
 
   } catch(e){
     console.error(e);
@@ -79,6 +95,7 @@ alert("✅ Login Success");
   }
 };
 
+  
 /* ================= LOGOUT ================= */
 window.logout = async () => {
   await signOut(auth);
