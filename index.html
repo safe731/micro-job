@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -751,9 +751,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script type="module">
-
-
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getDatabase, ref, set, get, update, push, onValue, increment, query, orderByChild, equalTo, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -764,8 +761,7 @@ const firebaseConfig = {
   projectId: "mail-fact",
   storageBucket: "mail-fact.firebasestorage.app",
   messagingSenderId: "800577449702",
-  appId: "1:800577449702:web:d20d9d442b4f46a8451527",
-  measurementId: "G-Y2YK6MK1HE"
+  appId: "1:800577449702:web:d20d9d442b4f46a8451527"
 };
 
   const app = initializeApp(firebaseConfig);
