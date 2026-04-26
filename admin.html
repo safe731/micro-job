@@ -31,7 +31,7 @@ body { background:#f3f4f6; }
 
   <!-- ADMIN PANEL -->
 
-  
+  <p> admin done ✅</p>
   <div id="adminPanel" style="display:none;">
     <button onclick="logout()" class="btn btn-danger mb-3">Logout</button>
     <div id="list"></div>
@@ -40,13 +40,24 @@ body { background:#f3f4f6; }
 
 
 
-
 <script type="module">
 
 /* ================= FIREBASE ================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  onAuthStateChanged, 
+  signOut 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+import { 
+  getDatabase, 
+  ref, 
+  onValue, 
+  update, 
+  get 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 /* ================= CONFIG ================= */
 const firebaseConfig = {
@@ -65,15 +76,16 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 
 let isProcessing = false;
+let isLoaded = false;
 
 /* ================= LOGIN ================= */
 document.getElementById("loginBtn").addEventListener("click", async () => {
 
-  const email = document.getElementById('email').value.trim();
-  const pass = document.getElementById('password').value;
+  const email = document.getElementById("email").value.trim();
+  const pass = document.getElementById("password").value;
 
   if(!email || !pass){
-    alert("Email & Password required!");
+    alert("❗ Email & Password required");
     return;
   }
 
@@ -81,27 +93,33 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
     const userCred = await signInWithEmailAndPassword(auth, email, pass);
     const user = userCred.user;
 
-    console.log("UID:", user.uid);
-
     const snap = await get(ref(db, "users/" + user.uid));
 
     if(!snap.exists() || snap.val().isAdmin !== true){
       alert("❌ তুমি Admin না!");
+      await signOut(auth);
       return;
     }
 
-    // 🔥 FORCE SHOW PANEL
-    document.getElementById('loginBox').style.display = "none";
-    document.getElementById('adminPanel').style.display = "block";
-
-    loadData();
+    showAdminPanel();
 
   } catch(e){
     console.error(e);
-    alert("Login Error: " + e.message);
+    alert("❌ Login Error: " + e.message);
   }
 
 });
+
+/* ================= SHOW PANEL ================= */
+function showAdminPanel(){
+  document.getElementById("loginBox").style.display = "none";
+  document.getElementById("adminPanel").style.display = "block";
+
+  if(!isLoaded){
+    loadData();
+    isLoaded = true;
+  }
+}
 
 /* ================= LOGOUT ================= */
 window.logout = async () => {
@@ -111,22 +129,27 @@ window.logout = async () => {
 
 /* ================= AUTO LOGIN ================= */
 onAuthStateChanged(auth, async (user) => {
-  if(user){
-    const snap = await get(ref(db, "users/" + user.uid));
 
-    if(snap.exists() && snap.val().isAdmin === true){
-      document.getElementById('loginBox').style.display = "none";
-      document.getElementById('adminPanel').style.display = "block";
-      loadData();
+  if(user){
+    try{
+      const snap = await get(ref(db, "users/" + user.uid));
+
+      if(snap.exists() && snap.val().isAdmin === true){
+        showAdminPanel();
+      }
+    }catch(e){
+      console.error(e);
     }
   }
+
 });
 
 /* ================= LOAD DATA ================= */
 function loadData(){
+
   onValue(ref(db, "submissions"), (snap) => {
 
-    const list = document.getElementById('list');
+    const list = document.getElementById("list");
     list.innerHTML = "";
 
     if(!snap.exists()){
@@ -150,19 +173,20 @@ function loadData(){
         <button 
           class="btn btn-success btn-sm me-2"
           onclick="approve('${key}','${d.userId}',${d.totalAmount || 0})">
-          Approve
+          ✅ Approve
         </button>
 
         <button 
           class="btn btn-danger btn-sm"
           onclick="reject('${key}','${d.userId}',${d.totalAmount || 0})">
-          Reject
+          ❌ Reject
         </button>
       </div>
       `;
     });
 
   });
+
 }
 
 /* ================= APPROVE ================= */
@@ -174,6 +198,12 @@ window.approve = async (id, uid, amount) => {
   try{
     const userRef = ref(db, "users/" + uid);
     const snap = await get(userRef);
+
+    if(!snap.exists()){
+      alert("User not found");
+      isProcessing = false;
+      return;
+    }
 
     let balance = snap.val().balance || 0;
     let hold = snap.val().hold || 0;
@@ -187,11 +217,11 @@ window.approve = async (id, uid, amount) => {
       hold: Math.max(0, hold - amount)
     });
 
-    alert("Approved");
+    alert("✅ Approved");
 
   }catch(e){
     console.error(e);
-    alert("Approve Error");
+    alert("❌ Approve Error");
   }
 
   isProcessing = false;
@@ -207,6 +237,12 @@ window.reject = async (id, uid, amount) => {
     const userRef = ref(db, "users/" + uid);
     const snap = await get(userRef);
 
+    if(!snap.exists()){
+      alert("User not found");
+      isProcessing = false;
+      return;
+    }
+
     let hold = snap.val().hold || 0;
 
     await update(ref(db, "submissions/" + id), {
@@ -217,23 +253,17 @@ window.reject = async (id, uid, amount) => {
       hold: Math.max(0, hold - amount)
     });
 
-    alert("Rejected");
+    alert("❌ Rejected");
 
   }catch(e){
     console.error(e);
-    alert("Reject Error");
+    alert("❌ Reject Error");
   }
 
   isProcessing = false;
 };
 
-window.addEventListener("load", () => {
-  console.log("Page Loaded");
-});
-
-  
 </script>
-
   
 </body>
 </html>
