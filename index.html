@@ -641,6 +641,7 @@
     <div class="nav-item" id="profile-btn" onclick="protectedAction('profile')"><i class="bi bi-person"></i><span>Profile</span></div>
 </div>
 
+
 <script>
 /* ============================================================
    LOGO URL — এক জায়গায় পরিবর্তন করলেই সব জায়গায় আপডেট হবে
@@ -752,22 +753,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script type="module">
 
-
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getDatabase } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getDatabase, ref, set, get, update, push, onValue, increment, query, orderByChild, equalTo, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBO-...",
+  apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
   authDomain: "mail-fact.firebaseapp.com",
-  databaseURL: "https://mail-fact-default-rtdb.firebaseio.com",
+  databaseURL: "https://mail-fact-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "mail-fact",
   storageBucket: "mail-fact.firebasestorage.app",
   messagingSenderId: "800577449702",
-  appId: "1:800577449702:web:0576286f40bfac40451527"
+  appId: "1:800577449702:web:0576286f40bfac40451527",
+  measurementId: "G-YDJKH34TVH"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
@@ -997,7 +998,7 @@ const db = getDatabase(app);
           document.getElementById('wdMainBalance').innerText = (Number(d.balance)||0).toFixed(2);
           document.getElementById('wdHoldBalance').innerText = (Number(d.hold)||0).toFixed(2);
           const rc = d.referralCode || "N/A"; document.getElementById('myReferralCode').innerText = rc;
-          let host = window.location.origin; if(!host||host==='null') host='https://safe731.github.io/micro-job';
+          let host = window.location.origin; if(!host||host==='null') host='https://safe731.github.io';
           document.getElementById('refLinkInput').value = host+window.location.pathname+"?ref="+rc;
           document.getElementById('referralEarnings').innerText = (Number(d.referralEarnings)||0).toFixed(2);
           if(d.paymentNumber) document.getElementById('wdAccNumber').value = d.paymentNumber;
@@ -1108,7 +1109,7 @@ const db = getDatabase(app);
   };
 
   window.handleLogout = () => { signOut(auth).then(()=>{showPopup('success','Logged Out','You have been logged out successfully.');switchTab('home');}); };
-  window.openSupport = () => window.open('http://t.me/techlystb','_blank');
+  window.openSupport = () => window.open('http://t.me/aveestb','_blank');
   window.logoutAllDevices = async () => {
       if(!window.currentUser) return;
       Swal.fire({title:'Logout All Devices?',text:"You will be logged out from this device too.",icon:'warning',showCancelButton:true,confirmButtonColor:'#d33',cancelButtonColor:'#3085d6',confirmButtonText:'Yes, logout all!'}).then(async(r)=>{if(r.isConfirmed){await update(ref(db,'users/'+window.currentUser.uid),{forceLogout:true});signOut(auth);}});
@@ -1276,6 +1277,9 @@ const db = getDatabase(app);
     
     function showError(title, msg) { Swal.fire({icon:'error',title:title,text:msg,confirmButtonColor:'#4F46E5'}); }
 </script>
+
+
+
 
 </body>
 </html>
