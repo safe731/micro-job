@@ -757,18 +757,16 @@ document.addEventListener('DOMContentLoaded', function() {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getDatabase, ref, set, get, update, push, onValue, increment, query, orderByChild, equalTo, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
 const firebaseConfig = {
   apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
   authDomain: "mail-fact.firebaseapp.com",
-  databaseURL: "https://mail-fact-default-rtdb.firebaseio.com",
+  databaseURL: "https://mail-fact-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "mail-fact",
   storageBucket: "mail-fact.firebasestorage.app",
   messagingSenderId: "800577449702",
-  appId: "1:800577449702:web:0576286f40bfac40451527"
+  appId: "1:800577449702:web:d20d9d442b4f46a8451527",
+  measurementId: "G-Y2YK6MK1HE"
 };
-
-
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
