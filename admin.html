@@ -24,12 +24,12 @@ body { background:#f3f4f6; }
     <h5>Admin Login</h5>
     <input type="email" id="email" class="form-control mb-2" placeholder="Email">
     <input type="password" id="password" class="form-control mb-2" placeholder="Password">
-    <button onclick="login()" class="btn btn-primary w-100">Login</button>
+    <button id="loginBtn" class="btn btn-primary w-100">Login</button>
   </div>
 
   <!-- ADMIN PANEL -->
   <div id="adminPanel" style="display:none;">
-    <button onclick="logout()" class="btn btn-danger mb-3">Logout</button>
+    <button id="logoutBtn" class="btn btn-danger mb-3">Logout</button>
     <div id="list"></div>
   </div>
 </div>
@@ -59,8 +59,12 @@ const db = getDatabase(app);
 
 let isProcessing = false;
 
+/* ================= BUTTON EVENTS ================= */
+document.getElementById("loginBtn").addEventListener("click", login);
+document.getElementById("logoutBtn").addEventListener("click", logout);
+
 /* ================= LOGIN ================= */
-window.login = async () => {
+async function login() {
   const email = document.getElementById('email').value.trim();
   const pass = document.getElementById('password').value;
 
@@ -73,7 +77,6 @@ window.login = async () => {
     const userCred = await signInWithEmailAndPassword(auth, email, pass);
     const user = userCred.user;
 
-    // 🔥 ADMIN CHECK
     const snap = await get(ref(db, "users/" + user.uid));
 
     if(!snap.exists() || snap.val().isAdmin !== true){
@@ -82,55 +85,44 @@ window.login = async () => {
       return;
     }
 
-    // 🔥 UI SHOW
-    document.getElementById('loginBox').style.display = "none";
-    document.getElementById('adminPanel').style.display = "block";
-
+    showAdmin();
     loadData();
 
   } catch(e){
     console.error(e);
     alert("❌ Login Error: " + e.message);
   }
-};
+}
 
 /* ================= LOGOUT ================= */
-window.logout = async () => {
+async function logout() {
   await signOut(auth);
   location.reload();
-};
+}
 
-/* ================= AUTO LOGIN CHECK ================= */
+/* ================= AUTO LOGIN ================= */
 onAuthStateChanged(auth, async (user) => {
 
   if(user){
-    try{
-      const snap = await get(ref(db, "users/" + user.uid));
+    const snap = await get(ref(db, "users/" + user.uid));
 
-      if(!snap.exists() || snap.val().isAdmin !== true){
-        await signOut(auth);
-        return;
-      }
-
-      document.getElementById('loginBox').style.display = "none";
-      document.getElementById('adminPanel').style.display = "block";
-
+    if(snap.exists() && snap.val().isAdmin === true){
+      showAdmin();
       loadData();
-
-    }catch(e){
-      console.error(e);
     }
   }
 });
 
+/* ================= SHOW PANEL ================= */
+function showAdmin(){
+  document.getElementById('loginBox').style.display = "none";
+  document.getElementById('adminPanel').style.display = "block";
+}
+
 /* ================= LOAD DATA ================= */
 function loadData(){
 
-  const submissionsRef = ref(db, "submissions");
-
-  onValue(submissionsRef, (snap) => {
-
-    console.log("DATA:", snap.val()); // 🔥 debug
+  onValue(ref(db, "submissions"), (snap) => {
 
     const list = document.getElementById('list');
     list.innerHTML = "";
@@ -156,14 +148,12 @@ function loadData(){
 
         <hr>
 
-        <button 
-          class="btn btn-success btn-sm me-2"
+        <button class="btn btn-success btn-sm me-2"
           onclick="approve('${key}','${d.userId}',${d.totalAmount || 0})">
           ✅ Approve
         </button>
 
-        <button 
-          class="btn btn-danger btn-sm"
+        <button class="btn btn-danger btn-sm"
           onclick="reject('${key}','${d.userId}',${d.totalAmount || 0})">
           ❌ Reject
         </button>
@@ -190,12 +180,6 @@ window.approve = async (id, uid, amount) => {
   try{
     const userRef = ref(db, "users/" + uid);
     const snap = await get(userRef);
-
-    if(!snap.exists()){
-      alert("User not found!");
-      isProcessing = false;
-      return;
-    }
 
     let balance = snap.val().balance || 0;
     let hold = snap.val().hold || 0;
@@ -228,12 +212,6 @@ window.reject = async (id, uid, amount) => {
   try{
     const userRef = ref(db, "users/" + uid);
     const snap = await get(userRef);
-
-    if(!snap.exists()){
-      alert("User not found!");
-      isProcessing = false;
-      return;
-    }
 
     let hold = snap.val().hold || 0;
 
