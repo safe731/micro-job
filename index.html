@@ -635,11 +635,23 @@
 
 <!-- ===== BOTTOM NAV ===== -->
 <div class="nav-bottom shadow">
-    <div class="nav-item active" id="home-btn" onclick="switchTab('home')"><i class="bi bi-house-door"></i><span>Home</span></div>
-    <div class="nav-item" id="history-btn" onclick="protectedAction('history')"><i class="bi bi-clock-history"></i><span>History</span></div>
-    <div class="nav-item" id="sellers-btn" onclick="switchTab('sellers')"><i class="bi bi-star"></i><span>Seller</span></div>
-    <div class="nav-item" id="profile-btn" onclick="protectedAction('profile')"><i class="bi bi-person"></i><span>Profile</span></div>
+    <div class="nav-item active" id="home-btn" onclick="navigateTo('home')">
+        <i class="bi bi-house-door"></i><span>Home</span>
+    </div>
+
+    <div class="nav-item" id="history-btn" onclick="navigateProtected('history')">
+        <i class="bi bi-clock-history"></i><span>History</span>
+    </div>
+
+    <div class="nav-item" id="sellers-btn" onclick="navigateTo('sellers')">
+        <i class="bi bi-star"></i><span>Seller</span>
+    </div>
+
+    <div class="nav-item" id="profile-btn" onclick="navigateProtected('profile')">
+        <i class="bi bi-person"></i><span>Profile</span>
+    </div>
 </div>
+
 
 <script>
 /* ============================================================
@@ -1271,6 +1283,76 @@ const firebaseConfig = {
     }
     
     function showError(title, msg) { Swal.fire({icon:'error',title:title,text:msg,confirmButtonColor:'#4F46E5'}); }
+
+
+
+
+
+// 🔐 Firebase Auth state check
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+        console.log("Logged in:", user.uid);
+    } else {
+        console.log("Not logged in");
+    }
+});
+
+
+// 🔹 Normal navigation (public pages)
+function navigateTo(tab) {
+    window.location.hash = "/" + tab;
+}
+
+
+// 🔐 Protected navigation (login required)
+function navigateProtected(tab) {
+    const user = firebase.auth().currentUser;
+
+    if (!user) {
+        alert("Login first!");
+        return;
+    }
+
+    window.location.hash = "/" + tab;
+}
+
+
+// 🔁 Page load / refresh handle
+window.addEventListener("load", () => {
+    const tab = location.hash.replace("#/", "") || "home";
+    switchTab(tab);
+});
+
+
+// 🔁 Hash change handle (back button / manual change)
+window.addEventListener("hashchange", () => {
+    const tab = location.hash.replace("#/", "") || "home";
+    switchTab(tab);
+});
+
+
+// 🔥 Tab switch function
+function switchTab(tab) {
+    // active class remove
+    document.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.remove('active');
+    });
+document.getElementById("home").style.display = "block";
+document.getElementById("profile").style.display = "none";
+
+    // active class add
+    const activeBtn = document.getElementById(tab + '-btn');
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+    }
+
+    // 👉 এখানে তোমার page content show/hide logic বসাও
+    console.log("Switched to:", tab);
+}
+
+
+    
+
 </script>
 
 </body>
