@@ -1,138 +1,193 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Admin Dashboard</title>
+<script type="module">
 
-<style>
-body {
-    font-family: Arial;
-    background: #f5f7fb;
-    padding: 20px;
-}
+/* ================= FIREBASE ================= */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-h2 {
-    margin-bottom: 20px;
-}
-
-.card {
-    background: #fff;
-    padding: 15px;
-    margin-bottom: 10px;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
-.btn {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    margin-right: 5px;
-}
-
-.approve {
-    background: #22c55e;
-    color: white;
-}
-
-.reject {
-    background: #ef4444;
-    color: white;
-}
-
-.pending {
-    color: orange;
-}
-</style>
-</head>
-
-<body>
-
-<h2>Withdraw Requests</h2>
-
-<div id="withdrawList"></div>
-
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-
-<script>
-// 🔥 তোমার Firebase config এখানে বসাও
+/* ================= CONFIG ================= */
 const firebaseConfig = {
- apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
+  apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
   authDomain: "mail-fact.firebaseapp.com",
-  databaseURL: "https://mail-fact-default-rtdb.asia-southeast1.firebasedatabase.app",
+  databaseURL: "https://mail-fact-default-rtdb.firebaseio.com",
   projectId: "mail-fact",
+  storageBucket: "mail-fact.firebasestorage.app",
+  messagingSenderId: "800577449702",
+  appId: "1:800577449702:web:0576286f40bfac40451527"
 };
 
-firebase.initializeApp(firebaseConfig);
+/* ================= INIT ================= */
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
 
-const db = firebase.database();
+let isProcessing = false;
 
-// 🔄 Load Withdraw Requests
-function loadRequests() {
-    db.ref("withdraw_requests").on("value", snapshot => {
-        const data = snapshot.val();
-        const container = document.getElementById("withdrawList");
-        container.innerHTML = "";
+/* ================= LOGIN ================= */
+document.getElementById("loginBtn").addEventListener("click", async () => {
 
-        for (let id in data) {
-            const item = data[id];
+  const email = document.getElementById('email').value.trim();
+  const pass = document.getElementById('password').value;
 
-            const div = document.createElement("div");
-            div.className = "card";
+  if(!email || !pass){
+    alert("Email & Password required!");
+    return;
+  }
 
-            div.innerHTML = `
-                <b>User:</b> ${item.userId}<br>
-                <b>Amount:</b> $${item.amount}<br>
-                <b>Status:</b> <span class="${item.status}">${item.status}</span><br><br>
+  try {
+    const userCred = await signInWithEmailAndPassword(auth, email, pass);
+    const user = userCred.user;
 
-                ${item.status === "pending" ? `
-                    <button class="btn approve" onclick="approve('${id}','${item.userId}',${item.amount})">Approve</button>
-                    <button class="btn reject" onclick="reject('${id}')">Reject</button>
-                ` : ""}
-            `;
+    console.log("UID:", user.uid);
 
-            container.appendChild(div);
-        }
+    const snap = await get(ref(db, "users/" + user.uid));
+
+    if(!snap.exists() || snap.val().isAdmin !== true){
+      alert("❌ তুমি Admin না!");
+      return;
+    }
+
+    // 🔥 FORCE SHOW PANEL
+    document.getElementById('loginBox').style.display = "none";
+    document.getElementById('adminPanel').style.display = "block";
+
+    loadData();
+
+  } catch(e){
+    console.error(e);
+    alert("Login Error: " + e.message);
+  }
+
+});
+
+/* ================= LOGOUT ================= */
+window.logout = async () => {
+  await signOut(auth);
+  location.reload();
+};
+
+/* ================= AUTO LOGIN ================= */
+onAuthStateChanged(auth, async (user) => {
+  if(user){
+    const snap = await get(ref(db, "users/" + user.uid));
+
+    if(snap.exists() && snap.val().isAdmin === true){
+      document.getElementById('loginBox').style.display = "none";
+      document.getElementById('adminPanel').style.display = "block";
+      loadData();
+    }
+  }
+});
+
+/* ================= LOAD DATA ================= */
+function loadData(){
+  onValue(ref(db, "submissions"), (snap) => {
+
+    const list = document.getElementById('list');
+    list.innerHTML = "";
+
+    if(!snap.exists()){
+      list.innerHTML = "<p class='text-center'>No submissions</p>";
+      return;
+    }
+
+    snap.forEach(child => {
+
+      const d = child.val();
+      const key = child.key;
+
+      list.innerHTML += `
+      <div class="card p-3 mb-3 shadow-sm">
+        <div><b>User:</b> ${d.username || "N/A"}</div>
+        <div><b>Total:</b> ${d.totalAmount || 0}</div>
+        <div><b>Status:</b> ${d.status || "pending"}</div>
+
+        <hr>
+
+        <button 
+          class="btn btn-success btn-sm me-2"
+          onclick="approve('${key}','${d.userId}',${d.totalAmount || 0})">
+          Approve
+        </button>
+
+        <button 
+          class="btn btn-danger btn-sm"
+          onclick="reject('${key}','${d.userId}',${d.totalAmount || 0})">
+          Reject
+        </button>
+      </div>
+      `;
     });
+
+  });
 }
 
+/* ================= APPROVE ================= */
+window.approve = async (id, uid, amount) => {
 
-// ✅ Approve Withdraw
-function approve(id, userId, amount) {
-    const ref = db.ref();
+  if(isProcessing) return;
+  isProcessing = true;
 
-    // 1. status update
-    ref.child("withdraw_requests/" + id).update({
-        status: "approved"
+  try{
+    const userRef = ref(db, "users/" + uid);
+    const snap = await get(userRef);
+
+    let balance = snap.val().balance || 0;
+    let hold = snap.val().hold || 0;
+
+    await update(ref(db, "submissions/" + id), {
+      status: "approved"
     });
 
-    // 2. balance update (auto)
-    ref.child("users/" + userId + "/balance").transaction(balance => {
-        return (balance || 0) - amount;
+    await update(userRef, {
+      balance: balance + amount,
+      hold: Math.max(0, hold - amount)
     });
 
-    alert("Approved & Balance Updated!");
-}
+    alert("Approved");
 
+  }catch(e){
+    console.error(e);
+    alert("Approve Error");
+  }
 
-// ❌ Reject Withdraw
-function reject(id) {
-    db.ref("withdraw_requests/" + id).update({
-        status: "rejected"
+  isProcessing = false;
+};
+
+/* ================= REJECT ================= */
+window.reject = async (id, uid, amount) => {
+
+  if(isProcessing) return;
+  isProcessing = true;
+
+  try{
+    const userRef = ref(db, "users/" + uid);
+    const snap = await get(userRef);
+
+    let hold = snap.val().hold || 0;
+
+    await update(ref(db, "submissions/" + id), {
+      status: "rejected"
     });
 
-    alert("Request Rejected!");
-}
+    await update(userRef, {
+      hold: Math.max(0, hold - amount)
+    });
 
+    alert("Rejected");
 
-// 🚀 Run
-loadRequests();
+  }catch(e){
+    console.error(e);
+    alert("Reject Error");
+  }
 
+  isProcessing = false;
+};
+
+window.addEventListener("load", () => {
+  console.log("Page Loaded");
+});
+
+  
 </script>
 
-</body>
-</html>
