@@ -1,115 +1,138 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <link rel="stylesheet" href="admin.css">
+<meta charset="UTF-8">
+<title>Admin Dashboard</title>
 
-  <title>Admin Panel</title>
-  <script type="module">
+<style>
+body {
+    font-family: Arial;
+    background: #f5f7fb;
+    padding: 20px;
+}
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+h2 {
+    margin-bottom: 20px;
+}
 
-const firebaseConfig = {
+.card {
+    background: #fff;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
 
-apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
-  authDomain: "mail-fact.firebaseapp.com",
-  databaseURL: "https://mail-fact-default-rtdb.firebaseio.com",
- 
-};
+.btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 5px;
+}
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+.approve {
+    background: #22c55e;
+    color: white;
+}
 
-onAuthStateChanged(auth, (user) => {
-  if (!user) return alert("Login required");
+.reject {
+    background: #ef4444;
+    color: white;
+}
 
-  onValue(ref(db, "users/" + user.uid), (snap) => {
-    if (!snap.val().isAdmin) {
-      alert("Not Admin");
-      location.href = "/";
-    }
-  });
-});
-
-// Load submissions
-onValue(ref(db, "submissions"), (snap) => {
-  const box = document.getElementById("submissions");
-  box.innerHTML = "";
-
-  snap.forEach((child) => {
-    const data = child.val();
-
-    box.innerHTML += `
-      <div style="border:1px solid #ccc; padding:10px; margin:10px">
-        <b>User:</b> ${data.username}<br>
-        <b>Amount:</b> ${data.totalAmount}<br>
-        <b>Status:</b> ${data.status}<br>
-        <button onclick="approve('${child.key}')">Approve</button>
-        <button onclick="reject('${child.key}')">Reject</button>
-      </div>
-    `;
-  });
-});
-
-window.approve = (id) => {
-  update(ref(db, "submissions/" + id), {
-    status: "approved"
-  });
-};
-
-window.reject = (id) => {
-  update(ref(db, "submissions/" + id), {
-    status: "rejected"
-  });
-};
-
-// Withdraw Requests
-onValue(ref(db, "withdraw_requests"), (snap) => {
-  const box = document.getElementById("withdraws");
-  box.innerHTML = "";
-
-  snap.forEach((child) => {
-    const data = child.val();
-
-    box.innerHTML += `
-  <div class="card">
-    <b>User:</b> ${data.username}<br>
-    <b>Amount:</b> ${data.totalAmount}<br>
-    <span class="status ${data.status}">${data.status}</span><br>
-
-    <button class="btn btn-approve" onclick="approve('${child.key}')">Approve</button>
-    <button class="btn btn-reject" onclick="reject('${child.key}')">Reject</button>
-  </div>
-`;
-
-  });
-});
-
-window.approveW = (id, uid, amount) => {
-  const updates = {};
-
-  updates["withdraw_requests/" + id + "/status"] = "approved";
-  updates["users/" + uid + "/balance"] = 0; // modify logic
-
-  update(ref(db), updates);
-};
-
-
-
-  </script>
+.pending {
+    color: orange;
+}
+</style>
 </head>
 
 <body>
-  <h2>Admin Panel</h2>
 
-  <h3>Submissions</h3>
-  <div id="submissions"></div>
+<h2>Withdraw Requests</h2>
 
-  <h3>Withdraw Requests</h3>
-  <div id="withdraws"></div>
-  
+<div id="withdrawList"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+
+<script>
+// 🔥 তোমার Firebase config এখানে বসাও
+const firebaseConfig = {
+ apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
+  authDomain: "mail-fact.firebaseapp.com",
+  databaseURL: "https://mail-fact-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "mail-fact",
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.database();
+
+// 🔄 Load Withdraw Requests
+function loadRequests() {
+    db.ref("withdraw_requests").on("value", snapshot => {
+        const data = snapshot.val();
+        const container = document.getElementById("withdrawList");
+        container.innerHTML = "";
+
+        for (let id in data) {
+            const item = data[id];
+
+            const div = document.createElement("div");
+            div.className = "card";
+
+            div.innerHTML = `
+                <b>User:</b> ${item.userId}<br>
+                <b>Amount:</b> $${item.amount}<br>
+                <b>Status:</b> <span class="${item.status}">${item.status}</span><br><br>
+
+                ${item.status === "pending" ? `
+                    <button class="btn approve" onclick="approve('${id}','${item.userId}',${item.amount})">Approve</button>
+                    <button class="btn reject" onclick="reject('${id}')">Reject</button>
+                ` : ""}
+            `;
+
+            container.appendChild(div);
+        }
+    });
+}
+
+
+// ✅ Approve Withdraw
+function approve(id, userId, amount) {
+    const ref = db.ref();
+
+    // 1. status update
+    ref.child("withdraw_requests/" + id).update({
+        status: "approved"
+    });
+
+    // 2. balance update (auto)
+    ref.child("users/" + userId + "/balance").transaction(balance => {
+        return (balance || 0) - amount;
+    });
+
+    alert("Approved & Balance Updated!");
+}
+
+
+// ❌ Reject Withdraw
+function reject(id) {
+    db.ref("withdraw_requests/" + id).update({
+        status: "rejected"
+    });
+
+    alert("Request Rejected!");
+}
+
+
+// 🚀 Run
+loadRequests();
+
+</script>
 
 </body>
 </html>
