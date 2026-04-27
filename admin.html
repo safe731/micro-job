@@ -1,7 +1,135 @@
+<style>
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: #f4f6fb;
+}
+
+/* 🔐 Login Box */
+#admin-login {
+    width: 320px;
+    margin: 100px auto;
+    background: #fff;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+#admin-login h2 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+#admin-login input {
+    width: 90%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    outline: none;
+}
+
+#admin-login button {
+    width: 95%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: #4F46E5;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+#admin-login button:hover {
+    background: #4338ca;
+}
 
 
+/* 📊 Dashboard */
+#admin-dashboard {
+    padding: 20px;
+}
+
+#admin-dashboard h2 {
+    margin-bottom: 10px;
+}
+
+#admin-dashboard p {
+    color: #666;
+    margin-bottom: 20px;
+}
 
 
+/* 📦 Card */
+.card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.card p {
+    margin: 5px 0;
+}
+
+
+/* 🎯 Status */
+.status {
+    font-weight: bold;
+}
+
+.pending {
+    color: orange;
+}
+
+.approved {
+    color: green;
+}
+
+.rejected {
+    color: red;
+}
+
+
+/* 🔘 Buttons */
+.btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    margin-right: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: 0.2s;
+}
+
+.btn-approve {
+    background: #22c55e;
+    color: white;
+}
+
+.btn-approve:hover {
+    background: #16a34a;
+}
+
+.btn-reject {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-reject:hover {
+    background: #dc2626;
+}
+
+
+</style>
 
 <div id="admin-login">
   <h2>Admin Login</h2>
