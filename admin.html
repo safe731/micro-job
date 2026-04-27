@@ -29,7 +29,8 @@ function adminLogin() {
         const uid = userCred.user.uid;
 
         // 🔍 Check admin
-        firebase.database().ref("users/" + uid).once("value")
+      
+      firebase.database().ref("users/" + uid).once("value")
         .then(snapshot => {
             const data = snapshot.val();
 
@@ -102,8 +103,71 @@ function reject(id) {
 
 
 
+function loadWithdrawRequests() {
+    firebase.database().ref("withdraw_requests").on("value", snapshot => {
+        const data = snapshot.val();
+        const container = document.getElementById("withdrawList");
+        container.innerHTML = "";
+
+        if (!data) {
+            container.innerHTML = "<p>No requests found</p>";
+            return;
+        }
+
+        for (let id in data) {
+            const item = data[id];
+
+            const div = document.createElement("div");
+            div.innerHTML = `
+                <p>User: ${item.userId}</p>
+                <p>Amount: ${item.amount}</p>
+                <p>Status: ${item.status}</p>
+
+                ${item.status === "pending" ? `
+                    <button onclick="approve('${id}','${item.userId}',${item.amount})">Approve</button>
+                    <button onclick="reject('${id}')">Reject</button>
+                ` : ""}
+                <hr>
+            `;
+
+            container.appendChild(div);
+        }
+    });
+}
+
+firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+        firebase.database().ref("users/" + user.uid).once("value")
+        .then(snapshot => {
+            const data = snapshot.val();
+
+            if (data && data.isAdmin === true) {
+                document.getElementById("admin-login").style.display = "none";
+                document.getElementById("admin-dashboard").style.display = "block";
+
+                loadWithdrawRequests();
+            }
+        });
+    }
+});
 
 
 
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+const firebaseConfig = {
+ apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
+  authDomain: "mail-fact.firebaseapp.com",
+  databaseURL: "https://mail-fact-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "mail-fact"
+};
+
+firebase.initializeApp(firebaseConfig);
+</script>
+
+  
 </script>
 
