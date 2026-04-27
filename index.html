@@ -1187,92 +1187,172 @@ const firebaseConfig = {
 
 <script>
     
-     const validTabs = ['home','history','sellers','profile','exchange_step'];
-    function switchTab(tabId, pushState = true) {
-        if (!validTabs.includes(tabId)) tabId = 'home';
-        document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-        const t = document.getElementById(tabId); if(t) t.classList.add('active');
-        const btn = document.getElementById(tabId+'-btn'); if(btn) btn.classList.add('active');
-        if (pushState) { const url = tabId==='home' ? '/' : '/'+tabId; history.pushState({tab:tabId},"",url); }
-        window.scrollTo(0,0);
-    }
+    const validTabs = ['home','history','sellers','profile','exchange_step'];
 
-    window.addEventListener('popstate', (e) => {
-        if (e.state && e.state.tab) switchTab(e.state.tab, false);
-        else switchTab('home', false);
-    });
+function switchTab(tabId, pushState = true) {
+    if (!validTabs.includes(tabId)) tabId = 'home';
 
-    function initAppRoute() {
-        let path = window.location.pathname.replace('/','');
-        if (path.includes('/')) path = path.split('/')[0];
-        if (path && validTabs.includes(path)) switchTab(path, false);
-        else switchTab('home', false);
-    }
-
-    function showHistoryTab(tab, e) {
-        document.querySelectorAll('.h-tab-btn').forEach(b => b.classList.remove('active'));
-        if(e && e.target) e.target.closest('.h-tab-btn').classList.add('active');
-        document.getElementById('history_sub').style.display = tab==='sub' ? 'block' : 'none';
-        document.getElementById('history_wd').style.display = tab==='wd' ? 'block' : 'none';
-        document.getElementById('history_trend').style.display = tab==='trend' ? 'block' : 'none';
-    }
-
-    function protectedAction(tabId) {
-        if (!window.currentUser) document.getElementById('auth-page').style.display = 'block';
-        else if (tabId === 'exchange_step') switchTab('exchange_step');
-        else switchTab(tabId);
-    }
-    
-    function toggleAuth(type) {
-        const title = document.getElementById('authTitle'); const sub = document.getElementById('authSubtitle');
-        document.getElementById('login-form').style.display = type==='login' ? 'block' : 'none';
-        document.getElementById('reg-form').style.display = type==='reg' ? 'block' : 'none';
-        if (type==='login') { title.innerText="Welcome Back to Mail Factory"; sub.innerText="আপনার একাউন্টে লগইন করে এক্সচেঞ্জ এবং ব্যালেন্স ম্যানেজ করুন।"; }
-        else { title.innerText="Mail Factory এ একাউন্ট খুলুন"; sub.innerText="দ্রুত, নিরাপদ এবং সহজভাবে এক্সচেঞ্জ শুরু করতে এখনই রেজিস্ট্রেশন করুন।"; }
-    }
-
-    window.updateTotal = function() {
-        const count = document.querySelectorAll('.gmail-row').length;
-        const type = document.getElementById('dollarType').value;
-        const rate = (type==='new') ? (window.currentDynamicRate||10) : (window.baseOldRate||8);
-        document.getElementById('tempTotal').innerText = count * rate;
-    };
-
-    window.addMoreRow = function(email='', pass='') {
-        const row = document.createElement('div'); row.className = 'gmail-row position-relative';
-        row.innerHTML = '<button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-x"></i></button><input type="email" class="g-input" value="'+email+'" placeholder="Enter Gmail Address" required><input type="text" class="p-input" value="'+pass+'" placeholder="Enter Password" required>';
-        document.getElementById('gmailRows').appendChild(row); window.updateTotal();
-    }
-
-    window.removeRow = function(el) {
-        const rows = document.querySelectorAll('.gmail-row');
-        if (rows.length <= 2) { showError("Warning","Minimum 2 emails required."); return; }
-        el.parentElement.remove(); window.updateTotal();
-    }
-
-    window.validateAndSubmit = function() {
-        const rows = document.querySelectorAll('.gmail-row');
-        if (rows.length < 2) { return showError("Validation Error","Minimum 2 emails required."); }
-        const gmails = []; let hasError = false; const ls = new Set(); const rx = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
-        rows.forEach((row, idx) => {
-            const email = row.querySelector('.g-input').value.trim().toLowerCase();
-            const pass = row.querySelector('.p-input').value.trim();
-            if (!email || !pass) { hasError=true; showError("Input Error","Row "+(idx+1)+" fields cannot be empty."); }
-            else if (!rx.test(email)) { hasError=true; showError("Invalid Email","Row "+(idx+1)+" is not a valid Gmail."); }
-            else if (pass.length < 6) { hasError=true; showError("Weak Password","Row "+(idx+1)+" password too short."); }
-            else if (ls.has(email)) { hasError=true; showError("Duplicate",email+" entered twice."); }
-            if (!hasError) { ls.add(email); gmails.push({email,password:pass}); }
-        });
-        if (!hasError) {
-            const type = document.getElementById('dollarType').value;
-            let rate = (type==='new') ? (window.currentDynamicRate||10) : (window.baseOldRate||8);
-            window.submitGmails({gmails, totalAmount: gmails.length*rate, rate, count: gmails.length});
+    // 👉 HASH routing use (GitHub fix)
+    if (pushState) {
+        const url = tabId === 'home' ? '#/' : '#/' + tabId;
+        if (location.hash !== url) {
+            window.location.hash = url;
+            return; // hashchange handle করবে
         }
     }
-    
-    function showError(title, msg) { Swal.fire({icon:'error',title:title,text:msg,confirmButtonColor:'#4F46E5'}); }
 
+    // UI update
+    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+
+    const t = document.getElementById(tabId);
+    if (t) t.classList.add('active');
+
+    const btn = document.getElementById(tabId+'-btn');
+    if (btn) btn.classList.add('active');
+
+    window.scrollTo(0,0);
+}
+
+
+// 🔁 HASH change handle (important fix)
+window.addEventListener('hashchange', () => {
+    let tab = location.hash.replace('#/','');
+    if (!validTabs.includes(tab)) tab = 'home';
+    switchTab(tab, false);
+});
+
+
+// 🔁 Page load handle (refresh fix)
+function initAppRoute() {
+    let tab = location.hash.replace('#/','');
+    if (!validTabs.includes(tab)) tab = 'home';
+    switchTab(tab, false);
+}
+
+
+// ❌ remove popstate (GitHub এ কাজ করে না)
+// window.addEventListener('popstate', ...);
+
+
+// 🔐 Protected action (unchanged but improved)
+function protectedAction(tabId) {
+    if (!window.currentUser) {
+        document.getElementById('auth-page').style.display = 'block';
+        return;
+    }
+
+    switchTab(tabId);
+}
+
+
+// -------------------- (rest unchanged) --------------------
+
+function showHistoryTab(tab, e) {
+    document.querySelectorAll('.h-tab-btn').forEach(b => b.classList.remove('active'));
+    if(e && e.target) e.target.closest('.h-tab-btn').classList.add('active');
+    document.getElementById('history_sub').style.display = tab==='sub' ? 'block' : 'none';
+    document.getElementById('history_wd').style.display = tab==='wd' ? 'block' : 'none';
+    document.getElementById('history_trend').style.display = tab==='trend' ? 'block' : 'none';
+}
+
+function toggleAuth(type) {
+    const title = document.getElementById('authTitle'); 
+    const sub = document.getElementById('authSubtitle');
+    document.getElementById('login-form').style.display = type==='login' ? 'block' : 'none';
+    document.getElementById('reg-form').style.display = type==='reg' ? 'block' : 'none';
+    if (type==='login') {
+        title.innerText="Welcome Back to Mail Factory";
+        sub.innerText="আপনার একাউন্টে লগইন করে এক্সচেঞ্জ এবং ব্যালেন্স ম্যানেজ করুন।";
+    } else {
+        title.innerText="Mail Factory এ একাউন্ট খুলুন";
+        sub.innerText="দ্রুত, নিরাপদ এবং সহজভাবে এক্সচেঞ্জ শুরু করতে এখনই রেজিস্ট্রেশন করুন।";
+    }
+}
+
+window.updateTotal = function() {
+    const count = document.querySelectorAll('.gmail-row').length;
+    const type = document.getElementById('dollarType').value;
+    const rate = (type==='new') ? (window.currentDynamicRate||10) : (window.baseOldRate||8);
+    document.getElementById('tempTotal').innerText = count * rate;
+};
+
+window.addMoreRow = function(email='', pass='') {
+    const row = document.createElement('div'); 
+    row.className = 'gmail-row position-relative';
+    row.innerHTML = '<button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-x"></i></button><input type="email" class="g-input" value="'+email+'" placeholder="Enter Gmail Address" required><input type="text" class="p-input" value="'+pass+'" placeholder="Enter Password" required>';
+    document.getElementById('gmailRows').appendChild(row); 
+    window.updateTotal();
+}
+
+window.removeRow = function(el) {
+    const rows = document.querySelectorAll('.gmail-row');
+    if (rows.length <= 2) { 
+        showError("Warning","Minimum 2 emails required."); 
+        return; 
+    }
+    el.parentElement.remove(); 
+    window.updateTotal();
+}
+
+window.validateAndSubmit = function() {
+    const rows = document.querySelectorAll('.gmail-row');
+    if (rows.length < 2) { 
+        return showError("Validation Error","Minimum 2 emails required."); 
+    }
+
+    const gmails = []; 
+    let hasError = false; 
+    const ls = new Set(); 
+    const rx = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+
+    rows.forEach((row, idx) => {
+        const email = row.querySelector('.g-input').value.trim().toLowerCase();
+        const pass = row.querySelector('.p-input').value.trim();
+
+        if (!email || !pass) {
+            hasError=true; 
+            showError("Input Error","Row "+(idx+1)+" fields cannot be empty.");
+        }
+        else if (!rx.test(email)) {
+            hasError=true; 
+            showError("Invalid Email","Row "+(idx+1)+" is not a valid Gmail.");
+        }
+        else if (pass.length < 6) {
+            hasError=true; 
+            showError("Weak Password","Row "+(idx+1)+" password too short.");
+        }
+        else if (ls.has(email)) {
+            hasError=true; 
+            showError("Duplicate",email+" entered twice.");
+        }
+
+        if (!hasError) { 
+            ls.add(email); 
+            gmails.push({email,password:pass}); 
+        }
+    });
+
+    if (!hasError) {
+        const type = document.getElementById('dollarType').value;
+        let rate = (type==='new') ? (window.currentDynamicRate||10) : (window.baseOldRate||8);
+        window.submitGmails({
+            gmails, 
+            totalAmount: gmails.length*rate, 
+            rate, 
+            count: gmails.length
+        });
+    }
+}
+
+function showError(title, msg) {
+    Swal.fire({
+        icon:'error',
+        title:title,
+        text:msg,
+        confirmButtonColor:'#4F46E5'
+    });
+}
 
 
 
