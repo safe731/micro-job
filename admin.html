@@ -1,220 +1,109 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Admin Panel</title>
 
-<meta name="viewport" content="width=device-width, initial-scale=1">
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<style>
-body{
-  background:#f3f4f6;
-}
-#adminPanel{
-  display:none;
-}
-</style>
 
-</head>
-<body>
 
-<div class="container py-5">
-
-  <!-- LOGIN -->
-  <div id="loginBox" class="card p-4 shadow">
-    <h4 class="mb-3">Admin Login</h4>
-
-    <input type="email" id="email" class="form-control mb-2" placeholder="Email">
-    <input type="password" id="password" class="form-control mb-3" placeholder="Password">
-
-    <button id="loginBtn" class="btn btn-primary w-100">Login</button>
-  </div>
-
-  <!-- ADMIN PANEL -->
-  <div id="adminPanel">
-
-    <div class="d-flex justify-content-between mb-3">
-      <h4>Admin Dashboard</h4>
-      <button onclick="logout()" class="btn btn-danger">Logout</button>
-    </div>
-
-    <div id="list"></div>
-
-  </div>
-
+<div id="admin-login">
+  <h2>Admin Login</h2>
+  <input type="email" id="email" placeholder="Email"><br><br>
+  <input type="password" id="password" placeholder="Password"><br><br>
+  <button onclick="adminLogin()">Login</button>
 </div>
 
-<script type="module">
+<div id="admin-dashboard" style="display:none;">
+  <h2>Admin Dashboard</h2>
+  <p>Welcome Admin</p>
 
-/* ========= FIREBASE ========= */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  <div id="withdrawList"></div>
+</div>
 
-/* ========= CONFIG ========= */
-const firebaseConfig = {
-  apiKey: "AIzaSyBO-...",
-  authDomain: "mail-fact.firebaseapp.com",
-  databaseURL: "https://mail-fact-default-rtdb.firebaseio.com",
-  projectId: "mail-fact",
-  storageBucket: "mail-fact.appspot.com",
-  messagingSenderId: "800577449702",
-  appId: "1:800577449702:web:xxxx"
-};
 
-/* ========= INIT ========= */
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
 
-let isProcessing = false;
+<script>
+function adminLogin() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
 
-/* ========= LOGIN ========= */
-document.getElementById("loginBtn").addEventListener("click", async () => {
+    firebase.auth().signInWithEmailAndPassword(email, password)
+    .then((userCred) => {
+        const uid = userCred.user.uid;
 
-  const email = document.getElementById('email').value;
-  const pass = document.getElementById('password').value;
+        // 🔍 Check admin
+        firebase.database().ref("users/" + uid).once("value")
+        .then(snapshot => {
+            const data = snapshot.val();
 
-  try{
-    const userCred = await signInWithEmailAndPassword(auth, email, pass);
-    const user = userCred.user;
+            if (data && data.isAdmin === true) {
+                document.getElementById("admin-login").style.display = "none";
+                document.getElementById("admin-dashboard").style.display = "block";
 
-    const snap = await get(ref(db, "users/" + user.uid));
-
-    if(!snap.exists() || snap.val().isAdmin !== true){
-      alert("❌ Not Admin");
-      await signOut(auth);
-      return;
-    }
-
-    showAdmin();
-
-  }catch(e){
-    alert("Login Error: " + e.message);
-  }
-
-});
-
-/* ========= AUTO LOGIN ========= */
-onAuthStateChanged(auth, async (user) => {
-
-  if(user){
-    const snap = await get(ref(db, "users/" + user.uid));
-
-    if(snap.exists() && snap.val().isAdmin === true){
-      showAdmin();
-    }
-  }
-
-});
-
-/* ========= SHOW ADMIN ========= */
-function showAdmin(){
-  document.getElementById('loginBox').style.display = "none";
-  document.getElementById('adminPanel').style.display = "block";
-  loadData();
+                loadWithdrawRequests();
+            } else {
+                alert("Access Denied! Not Admin");
+            }
+        });
+    })
+    .catch(err => {
+        alert("Login Failed: " + err.message);
+    });
 }
+function loadWithdrawRequests() {
+    firebase.database().ref("withdraw_requests").on("value", snapshot => {
+        const data = snapshot.val();
+        const container = document.getElementById("withdrawList");
+        container.innerHTML = "";
 
-/* ========= LOGOUT ========= */
-window.logout = async () => {
-  await signOut(auth);
-  location.reload();
-};
+        for (let id in data) {
+            const item = data[id];
 
-/* ========= LOAD DATA ========= */
-function loadData(){
+            const div = document.createElement("div");
+            div.innerHTML = `
+                <p>User: ${item.userId}</p>
+                <p>Amount: ${item.amount}</p>
+                <p>Status: ${item.status}</p>
 
-  onValue(ref(db, "submissions"), (snap) => {
+                ${item.status === "pending" ? `
+                    <button onclick="approve('${id}','${item.userId}',${item.amount})">Approve</button>
+                    <button onclick="reject('${id}')">Reject</button>
+                ` : ""}
+                <hr>
+            `;
 
-    const list = document.getElementById('list');
-    list.innerHTML = "";
+            container.appendChild(div);
+        }
+    });
+}
+function approve(id, userId, amount) {
+    const db = firebase.database();
 
-    if(!snap.exists()){
-      list.innerHTML = "<p>No data</p>";
-      return;
-    }
-
-    snap.forEach(child => {
-
-      const d = child.val();
-      const key = child.key;
-
-      list.innerHTML += `
-      <div class="card p-3 mb-3">
-        <div><b>User:</b> ${d.username || "N/A"}</div>
-        <div><b>Amount:</b> ${d.totalAmount || 0}</div>
-        <div><b>Status:</b> ${d.status || "pending"}</div>
-
-        <button class="btn btn-success mt-2"
-          onclick="approve('${key}','${d.userId}',${d.totalAmount || 0}')">
-          Approve
-        </button>
-
-        <button class="btn btn-danger mt-2"
-          onclick="reject('${key}','${d.userId}',${d.totalAmount || 0}')">
-          Reject
-        </button>
-      </div>
-      `;
+    // status update
+    db.ref("withdraw_requests/" + id).update({
+        status: "approved"
     });
 
-  });
+    // balance deduct
+    db.ref("users/" + userId + "/balance").transaction(balance => {
+        return (balance || 0) - amount;
+    });
 
+    alert("Approved!");
 }
 
-/* ========= APPROVE ========= */
-window.approve = async (id, uid, amount) => {
+function reject(id) {
+    firebase.database().ref("withdraw_requests/" + id).update({
+        status: "rejected"
+    });
 
-  if(isProcessing) return;
-  isProcessing = true;
+    alert("Rejected!");
+}
 
-  const userRef = ref(db, "users/" + uid);
-  const snap = await get(userRef);
 
-  let balance = snap.val().balance || 0;
-  let hold = snap.val().hold || 0;
 
-  await update(ref(db, "submissions/" + id), {
-    status: "approved"
-  });
 
-  await update(userRef, {
-    balance: balance + amount,
-    hold: Math.max(0, hold - amount)
-  });
 
-  alert("Approved");
 
-  isProcessing = false;
-};
 
-/* ========= REJECT ========= */
-window.reject = async (id, uid, amount) => {
 
-  if(isProcessing) return;
-  isProcessing = true;
-
-  const userRef = ref(db, "users/" + uid);
-  const snap = await get(userRef);
-
-  let hold = snap.val().hold || 0;
-
-  await update(ref(db, "submissions/" + id), {
-    status: "rejected"
-  });
-
-  await update(userRef, {
-    hold: Math.max(0, hold - amount)
-  });
-
-  alert("Rejected");
-
-  isProcessing = false;
-};
 
 </script>
 
-</body>
-</html>
