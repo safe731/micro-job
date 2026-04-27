@@ -635,21 +635,10 @@
 
 <!-- ===== BOTTOM NAV ===== -->
 <div class="nav-bottom shadow">
-    <div class="nav-item active" id="home-btn" onclick="navigateTo('home')">
-        <i class="bi bi-house-door"></i><span>Home</span>
-    </div>
-
-    <div class="nav-item" id="history-btn" onclick="navigateProtected('history')">
-        <i class="bi bi-clock-history"></i><span>History</span>
-    </div>
-
-    <div class="nav-item" id="sellers-btn" onclick="navigateTo('sellers')">
-        <i class="bi bi-star"></i><span>Seller</span>
-    </div>
-
-    <div class="nav-item" id="profile-btn" onclick="navigateProtected('profile')">
-        <i class="bi bi-person"></i><span>Profile</span>
-    </div>
+    <div class="nav-item active" id="home-btn" onclick="switchTab('home')"><i class="bi bi-house-door"></i><span>Home</span></div>
+    <div class="nav-item" id="history-btn" onclick="protectedAction('history')"><i class="bi bi-clock-history"></i><span>History</span></div>
+    <div class="nav-item" id="sellers-btn" onclick="switchTab('sellers')"><i class="bi bi-star"></i><span>Seller</span></div>
+    <div class="nav-item" id="profile-btn" onclick="protectedAction('profile')"><i class="bi bi-person"></i><span>Profile</span></div>
 </div>
 
 
