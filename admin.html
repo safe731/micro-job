@@ -1,105 +1,220 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Admin Panel</title>
-  <script type="module">
+<meta charset="UTF-8">
+<title>Admin Panel</title>
 
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body{
+  background:#f3f4f6;
+}
+#adminPanel{
+  display:none;
+}
+</style>
+
+</head>
+<body>
+
+<div class="container py-5">
+
+  <!-- LOGIN -->
+  <div id="loginBox" class="card p-4 shadow">
+    <h4 class="mb-3">Admin Login</h4>
+
+    <input type="email" id="email" class="form-control mb-2" placeholder="Email">
+    <input type="password" id="password" class="form-control mb-3" placeholder="Password">
+
+    <button id="loginBtn" class="btn btn-primary w-100">Login</button>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="adminPanel">
+
+    <div class="d-flex justify-content-between mb-3">
+      <h4>Admin Dashboard</h4>
+      <button onclick="logout()" class="btn btn-danger">Logout</button>
+    </div>
+
+    <div id="list"></div>
+
+  </div>
+
+</div>
+
+<script type="module">
+
+/* ========= FIREBASE ========= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
+/* ========= CONFIG ========= */
 const firebaseConfig = {
-
-apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
+  apiKey: "AIzaSyBO-...",
   authDomain: "mail-fact.firebaseapp.com",
   databaseURL: "https://mail-fact-default-rtdb.firebaseio.com",
- 
+  projectId: "mail-fact",
+  storageBucket: "mail-fact.appspot.com",
+  messagingSenderId: "800577449702",
+  appId: "1:800577449702:web:xxxx"
 };
 
+/* ========= INIT ========= */
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-onAuthStateChanged(auth, (user) => {
-  if (!user) return alert("Login required");
+let isProcessing = false;
 
-  onValue(ref(db, "users/" + user.uid), (snap) => {
-    if (!snap.val().isAdmin) {
-      alert("Not Admin");
-      location.href = "/";
+/* ========= LOGIN ========= */
+document.getElementById("loginBtn").addEventListener("click", async () => {
+
+  const email = document.getElementById('email').value;
+  const pass = document.getElementById('password').value;
+
+  try{
+    const userCred = await signInWithEmailAndPassword(auth, email, pass);
+    const user = userCred.user;
+
+    const snap = await get(ref(db, "users/" + user.uid));
+
+    if(!snap.exists() || snap.val().isAdmin !== true){
+      alert("❌ Not Admin");
+      await signOut(auth);
+      return;
     }
-  });
+
+    showAdmin();
+
+  }catch(e){
+    alert("Login Error: " + e.message);
+  }
+
 });
 
-// Load submissions
-onValue(ref(db, "submissions"), (snap) => {
-  const box = document.getElementById("submissions");
-  box.innerHTML = "";
+/* ========= AUTO LOGIN ========= */
+onAuthStateChanged(auth, async (user) => {
 
-  snap.forEach((child) => {
-    const data = child.val();
+  if(user){
+    const snap = await get(ref(db, "users/" + user.uid));
 
-    box.innerHTML += `
-      <div style="border:1px solid #ccc; padding:10px; margin:10px">
-        <b>User:</b> ${data.username}<br>
-        <b>Amount:</b> ${data.totalAmount}<br>
-        <b>Status:</b> ${data.status}<br>
-        <button onclick="approve('${child.key}')">Approve</button>
-        <button onclick="reject('${child.key}')">Reject</button>
+    if(snap.exists() && snap.val().isAdmin === true){
+      showAdmin();
+    }
+  }
+
+});
+
+/* ========= SHOW ADMIN ========= */
+function showAdmin(){
+  document.getElementById('loginBox').style.display = "none";
+  document.getElementById('adminPanel').style.display = "block";
+  loadData();
+}
+
+/* ========= LOGOUT ========= */
+window.logout = async () => {
+  await signOut(auth);
+  location.reload();
+};
+
+/* ========= LOAD DATA ========= */
+function loadData(){
+
+  onValue(ref(db, "submissions"), (snap) => {
+
+    const list = document.getElementById('list');
+    list.innerHTML = "";
+
+    if(!snap.exists()){
+      list.innerHTML = "<p>No data</p>";
+      return;
+    }
+
+    snap.forEach(child => {
+
+      const d = child.val();
+      const key = child.key;
+
+      list.innerHTML += `
+      <div class="card p-3 mb-3">
+        <div><b>User:</b> ${d.username || "N/A"}</div>
+        <div><b>Amount:</b> ${d.totalAmount || 0}</div>
+        <div><b>Status:</b> ${d.status || "pending"}</div>
+
+        <button class="btn btn-success mt-2"
+          onclick="approve('${key}','${d.userId}',${d.totalAmount || 0}')">
+          Approve
+        </button>
+
+        <button class="btn btn-danger mt-2"
+          onclick="reject('${key}','${d.userId}',${d.totalAmount || 0}')">
+          Reject
+        </button>
       </div>
-    `;
-  });
-});
+      `;
+    });
 
-window.approve = (id) => {
-  update(ref(db, "submissions/" + id), {
+  });
+
+}
+
+/* ========= APPROVE ========= */
+window.approve = async (id, uid, amount) => {
+
+  if(isProcessing) return;
+  isProcessing = true;
+
+  const userRef = ref(db, "users/" + uid);
+  const snap = await get(userRef);
+
+  let balance = snap.val().balance || 0;
+  let hold = snap.val().hold || 0;
+
+  await update(ref(db, "submissions/" + id), {
     status: "approved"
   });
+
+  await update(userRef, {
+    balance: balance + amount,
+    hold: Math.max(0, hold - amount)
+  });
+
+  alert("Approved");
+
+  isProcessing = false;
 };
 
-window.reject = (id) => {
-  update(ref(db, "submissions/" + id), {
+/* ========= REJECT ========= */
+window.reject = async (id, uid, amount) => {
+
+  if(isProcessing) return;
+  isProcessing = true;
+
+  const userRef = ref(db, "users/" + uid);
+  const snap = await get(userRef);
+
+  let hold = snap.val().hold || 0;
+
+  await update(ref(db, "submissions/" + id), {
     status: "rejected"
   });
-};
 
-// Withdraw Requests
-onValue(ref(db, "withdraw_requests"), (snap) => {
-  const box = document.getElementById("withdraws");
-  box.innerHTML = "";
-
-  snap.forEach((child) => {
-    const data = child.val();
-
-    box.innerHTML += `
-      <div style="border:1px solid red; padding:10px; margin:10px">
-        <b>${data.username}</b><br>
-        ${data.amount} BDT<br>
-        <button onclick="approveW('${child.key}', '${data.userId}', ${data.amount})">Approve</button>
-      </div>
-    `;
+  await update(userRef, {
+    hold: Math.max(0, hold - amount)
   });
-});
 
-window.approveW = (id, uid, amount) => {
-  const updates = {};
+  alert("Rejected");
 
-  updates["withdraw_requests/" + id + "/status"] = "approved";
-  updates["users/" + uid + "/balance"] = 0; // modify logic
-
-  update(ref(db), updates);
+  isProcessing = false;
 };
 
-  </script>
-</head>
+</script>
 
-<body>
-  <h2>Admin Panel</h2>
-
-  <h3>Submissions</h3>
-  <div id="submissions"></div>
-
-  <h3>Withdraw Requests</h3>
-  <div id="withdraws"></div>
 </body>
 </html>
