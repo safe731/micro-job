@@ -32,6 +32,21 @@ button {
 }
 
 
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.card {
+  background: white;
+  padding: 15px;
+  border-radius: 10px;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+  
 
 </style>
 
@@ -52,6 +67,18 @@ button {
   <div id="withdrawList"></div>
 </div>
 
+<h2>📊 Admin Analytics Dashboard</h2>
+
+<div class="stats">
+  <div class="card">Users: <span id="totalUsers">0</span></div>
+  <div class="card">Submissions: <span id="totalSub">0</span></div>
+  <div class="card">Approved: <span id="approvedSub">0</span></div>
+  <div class="card">Pending: <span id="pendingSub">0</span></div>
+  <div class="card">Rejected: <span id="rejectedSub">0</span></div>
+  <div class="card">Total Balance: <span id="totalBalance">0</span></div>
+</div>
+
+<canvas id="chart" height="100"></canvas>
 
 
 
@@ -191,13 +218,97 @@ function rejectWithdraw(id, userId, amount) {
   alert("Withdraw Rejected & টাকা ফেরত ✅");
 }
 
+let chart;
 
+function loadDashboard() {
+
+  // 🔹 USERS
+  firebase.database().ref("users").on("value", snap => {
+    let totalUsers = 0;
+    let totalBalance = 0;
+
+    snap.forEach(child => {
+      totalUsers++;
+      totalBalance += Number(child.val().balance || 0);
+    });
+
+    document.getElementById("totalUsers").innerText = totalUsers;
+    document.getElementById("totalBalance").innerText = totalBalance;
+  });
+
+  // 🔹 SUBMISSIONS
+  firebase.database().ref("submissions").on("value", snap => {
+    let total = 0;
+    let approved = 0;
+    let pending = 0;
+    let rejected = 0;
+
+    let dailyData = {};
+
+    snap.forEach(child => {
+      const s = child.val();
+      total++;
+
+      if (s.status === "approved") approved++;
+      else if (s.status === "pending") pending++;
+      else if (s.status === "rejected") rejected++;
+
+      // 📊 Chart data
+      if (s.status === "approved") {
+        let date = new Date(s.submittedAt).toLocaleDateString();
+
+        if (!dailyData[date]) dailyData[date] = 0;
+        dailyData[date] += Number(s.totalAmount || 0);
+      }
+    });
+
+    document.getElementById("totalSub").innerText = total;
+    document.getElementById("approvedSub").innerText = approved;
+    document.getElementById("pendingSub").innerText = pending;
+    document.getElementById("rejectedSub").innerText = rejected;
+
+    updateChart(dailyData);
+  });
+
+}
+
+
+function updateChart(data) {
+  const labels = Object.keys(data);
+  const values = Object.values(data);
+
+  const ctx = document.getElementById("chart").getContext("2d");
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Daily Earnings",
+        data: values,
+        borderWidth: 2
+      }]
+    }
+  });
+}
+
+
+
+
+
+
+  
+  
+</script>
 
 
 
 
 
     
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -215,6 +326,4 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 </script>
 
-  
-</script>
 
