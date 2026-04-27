@@ -1,132 +1,36 @@
 <style>
 body {
-    margin: 0;
-    font-family: 'Segoe UI', sans-serif;
-    background: #f4f6fb;
+  font-family: Arial;
+  background: #f4f6f9;
+  padding: 20px;
 }
 
-/* 🔐 Login Box */
-#admin-login {
-    width: 320px;
-    margin: 100px auto;
-    background: #fff;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-    text-align: center;
+h2, h3 {
+  color: #333;
 }
 
-#admin-login h2 {
-    margin-bottom: 20px;
-    color: #333;
+input {
+  padding: 10px;
+  width: 250px;
 }
 
-#admin-login input {
-    width: 90%;
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    outline: none;
+button {
+  padding: 8px 12px;
+  border: none;
+  background: #4F46E5;
+  color: white;
+  cursor: pointer;
+  margin: 5px;
 }
 
-#admin-login button {
-    width: 95%;
-    padding: 10px;
-    border: none;
-    border-radius: 6px;
-    background: #4F46E5;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-#admin-login button:hover {
-    background: #4338ca;
-}
-
-
-/* 📊 Dashboard */
-#admin-dashboard {
-    padding: 20px;
-}
-
-#admin-dashboard h2 {
-    margin-bottom: 10px;
-}
-
-#admin-dashboard p {
-    color: #666;
-    margin-bottom: 20px;
-}
-
-
-/* 📦 Card */
 .card {
-    background: white;
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    transition: 0.2s;
+  background: white;
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-.card:hover {
-    transform: translateY(-2px);
-}
-
-.card p {
-    margin: 5px 0;
-}
-
-
-/* 🎯 Status */
-.status {
-    font-weight: bold;
-}
-
-.pending {
-    color: orange;
-}
-
-.approved {
-    color: green;
-}
-
-.rejected {
-    color: red;
-}
-
-
-/* 🔘 Buttons */
-.btn {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    margin-right: 5px;
-    cursor: pointer;
-    font-size: 13px;
-    transition: 0.2s;
-}
-
-.btn-approve {
-    background: #22c55e;
-    color: white;
-}
-
-.btn-approve:hover {
-    background: #16a34a;
-}
-
-.btn-reject {
-    background: #ef4444;
-    color: white;
-}
-
-.btn-reject:hover {
-    background: #dc2626;
-}
 
 
 </style>
@@ -140,145 +44,160 @@ body {
 
 <div id="admin-dashboard" style="display:none;">
   <h2>Admin Dashboard</h2>
-  <p>Welcome Admin</p>
 
+  <h3>📥 Submissions</h3>
+  <div id="submissionList"></div>
+
+  <h3>💸 Withdraw Requests</h3>
   <div id="withdrawList"></div>
 </div>
 
 
 
+
 <script>
 function adminLogin() {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+  const email = email.value;
+  const password = password.value;
 
-    firebase.auth().signInWithEmailAndPassword(email, password)
-    .then((userCred) => {
-        const uid = userCred.user.uid;
+  firebase.auth().signInWithEmailAndPassword(email, password)
+  .then(userCred => {
+    const uid = userCred.user.uid;
 
-        // 🔍 Check admin
-      
-      firebase.database().ref("users/" + uid).once("value")
-        .then(snapshot => {
-            const data = snapshot.val();
+    firebase.database().ref("users/" + uid).once("value")
+    .then(snap => {
+      const data = snap.val();
 
-            if (data && data.isAdmin === true) {
-                document.getElementById("admin-login").style.display = "none";
-                document.getElementById("admin-dashboard").style.display = "block";
+      if (data && data.isAdmin === true) {
+        document.getElementById("admin-login").style.display = "none";
+        document.getElementById("admin-dashboard").style.display = "block";
 
-                loadWithdrawRequests();
-            } else {
-                alert("Access Denied! Not Admin");
-            }
-        });
-    })
-    .catch(err => {
-        alert("Login Failed: " + err.message);
+        loadSubmissions();
+        loadWithdraws();
+      } else {
+        alert("Not Admin!");
+      }
     });
-}
-function loadWithdrawRequests() {
-    firebase.database().ref("withdraw_requests").on("value", snapshot => {
-        const data = snapshot.val();
-        const container = document.getElementById("withdrawList");
-        container.innerHTML = "";
-
-        for (let id in data) {
-            const item = data[id];
-
-            const div = document.createElement("div");
-            div.innerHTML = `
-                <p>User: ${item.userId}</p>
-                <p>Amount: ${item.amount}</p>
-                <p>Status: ${item.status}</p>
-
-                ${item.status === "pending" ? `
-                    <button onclick="approve('${id}','${item.userId}',${item.amount})">Approve</button>
-                    <button onclick="reject('${id}')">Reject</button>
-                ` : ""}
-                <hr>
-            `;
-
-            container.appendChild(div);
-        }
-    });
-}
-function approve(id, userId, amount) {
-    const db = firebase.database();
-
-    // status update
-    db.ref("withdraw_requests/" + id).update({
-        status: "approved"
-    });
-
-    // balance deduct
-    db.ref("users/" + userId + "/balance").transaction(balance => {
-        return (balance || 0) - amount;
-    });
-
-    alert("Approved!");
-}
-
-function reject(id) {
-    firebase.database().ref("withdraw_requests/" + id).update({
-        status: "rejected"
-    });
-
-    alert("Rejected!");
+  });
 }
 
 
+function loadSubmissions() {
+  firebase.database().ref("submissions").on("value", snap => {
+    const data = snap.val();
+    const container = document.getElementById("submissionList");
+    container.innerHTML = "";
 
+    for (let id in data) {
+      const item = data[id];
 
+      const div = document.createElement("div");
+      div.className = "card";
 
+      div.innerHTML = `
+        <p>User: ${item.username}</p>
+        <p>Amount: ${item.totalAmount}</p>
+        <p>Status: ${item.status}</p>
 
-function loadWithdrawRequests() {
-    firebase.database().ref("withdraw_requests").on("value", snapshot => {
-        const data = snapshot.val();
-        const container = document.getElementById("withdrawList");
-        container.innerHTML = "";
+        ${item.status === "pending" ? `
+          <button onclick="approveSubmission('${id}','${item.userId}',${item.totalAmount})">Approve</button>
+          <button onclick="rejectSubmission('${id}')">Reject</button>
+        ` : ""}
+      `;
 
-        if (!data) {
-            container.innerHTML = "<p>No requests found</p>";
-            return;
-        }
-
-        for (let id in data) {
-            const item = data[id];
-
-            const div = document.createElement("div");
-            div.innerHTML = `
-                <p>User: ${item.userId}</p>
-                <p>Amount: ${item.amount}</p>
-                <p>Status: ${item.status}</p>
-
-                ${item.status === "pending" ? `
-                    <button onclick="approve('${id}','${item.userId}',${item.amount})">Approve</button>
-                    <button onclick="reject('${id}')">Reject</button>
-                ` : ""}
-                <hr>
-            `;
-
-            container.appendChild(div);
-        }
-    });
-}
-
-firebase.auth().onAuthStateChanged(user => {
-    if (user) {
-        firebase.database().ref("users/" + user.uid).once("value")
-        .then(snapshot => {
-            const data = snapshot.val();
-
-            if (data && data.isAdmin === true) {
-                document.getElementById("admin-login").style.display = "none";
-                document.getElementById("admin-dashboard").style.display = "block";
-
-                loadWithdrawRequests();
-            }
-        });
+      container.appendChild(div);
     }
-});
+  });
+}
 
+
+function approveSubmission(id, userId, amount) {
+  const db = firebase.database();
+
+  // status update
+  db.ref("submissions/" + id).update({
+    status: "approved"
+  });
+
+  // 🔥 HOLD → BALANCE TRANSFER
+  db.ref("users/" + userId).transaction(user => {
+    if (user) {
+      user.hold = (user.hold || 0) - amount;
+      user.balance = (user.balance || 0) + amount;
+    }
+    return user;
+  });
+
+  alert("Submission Approved ✅");
+}
+
+function rejectSubmission(id) {
+  firebase.database().ref("submissions/" + id).update({
+    status: "rejected"
+  });
+
+  alert("Rejected ❌");
+}
+
+function loadWithdraws() {
+  firebase.database().ref("withdraw_requests").on("value", snap => {
+    const data = snap.val();
+    const container = document.getElementById("withdrawList");
+    container.innerHTML = "";
+
+    for (let id in data) {
+      const item = data[id];
+
+      const div = document.createElement("div");
+      div.className = "card";
+
+      div.innerHTML = `
+        <p>User: ${item.username}</p>
+        <p>Amount: ${item.amount}</p>
+        <p>Status: ${item.status}</p>
+
+        ${item.status === "pending" ? `
+          <button onclick="approveWithdraw('${id}')">Approve</button>
+          <button onclick="rejectWithdraw('${id}','${item.userId}',${item.amount})">Reject</button>
+        ` : ""}
+      `;
+
+      container.appendChild(div);
+    }
+  });function approveWithdraw(id) {
+  firebase.database().ref("withdraw_requests/" + id).update({
+    status: "approved"
+  });
+
+  alert("Withdraw Approved 💸");
+}
+}
+
+function rejectWithdraw(id, userId, amount) {
+  const db = firebase.database();
+
+  db.ref("withdraw_requests/" + id).update({
+    status: "rejected"
+  });
+
+  // টাকা ফেরত
+  db.ref("users/" + userId).transaction(user => {
+    if (user) {
+      user.balance = (user.balance || 0) + amount;
+    }
+    return user;
+  });
+
+  alert("Withdraw Rejected & টাকা ফেরত ✅");
+}
+
+
+
+
+
+
+
+    
 
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
