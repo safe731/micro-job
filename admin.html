@@ -1,9 +1,40 @@
 <style>
 body {
-  font-family: Arial;
-  background: #f4f6f9;
-  padding: 20px;
+  margin: 0;
+  font-family: sans-serif;
+  background: #f1f5f9;
 }
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  background: white;
+  border-top: 1px solid #ddd;
+}
+
+.bottom-nav div {
+  flex: 1;
+  text-align: center;
+  padding: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.bottom-nav div:hover {
+  background: #f3f4f6;
+}
+
+.section {
+  display: none;
+  padding: 15px;
+}
+
+.active {
+  display: block;
+}
+
 
 h2, h3 {
   color: #333;
@@ -32,21 +63,14 @@ button {
 }
 
 
+  
 .stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
-.card {
-  background: white;
-  padding: 15px;
-  border-radius: 10px;
-  font-weight: bold;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
 
-  
 
 </style>
 
@@ -56,6 +80,14 @@ button {
   <input type="password" id="password" placeholder="Password"><br><br>
   <button onclick="adminLogin()">Login</button>
 </div>
+
+<div class="bottom-nav">
+  <div onclick="switchTab('home')">🏠<br>Home</div>
+  <div onclick="switchTab('history')">📊<br>History</div>
+  <div onclick="switchTab('wallet')">💰<br>Wallet</div>
+  <div onclick="switchTab('profile')">👤<br>Profile</div>
+</div>
+
 
 <div id="admin-dashboard" style="display:none;">
   <h2>Admin Dashboard</h2>
@@ -80,6 +112,12 @@ button {
 
 <canvas id="chart" height="100"></canvas>
 
+
+
+<div id="home" class="section active">🏠 Home Content</div>
+<div id="history" class="section">📊 History</div>
+<div id="wallet" class="section">💰 Wallet</div>
+<div id="profile" class="section">👤 Profile</div>
 
 
 <script>
@@ -294,7 +332,58 @@ function updateChart(data) {
   });
 }
 
+function startAutoWithdrawBot() {
+  const db = firebase.database();
 
+  db.ref("withdraw_requests").on("value", snap => {
+    if (!snap.exists()) return;
+
+    snap.forEach(child => {
+      const id = child.key;
+      const data = child.val();
+
+      // শুধু pending হলে কাজ করবে
+      if (data.status !== "pending") return;
+
+      const userId = data.userId;
+      const amount = Number(data.amount || 0);
+
+      // 🔍 user data নাও
+      db.ref("users/" + userId).once("value").then(userSnap => {
+        const user = userSnap.val();
+        if (!user) return;
+
+        const balance = Number(user.balance || 0);
+
+        // ✅ condition: balance >= amount
+        if (balance >= 0) {
+          // 🔥 AUTO APPROVE
+          db.ref("withdraw_requests/" + id).update({
+            status: "approved",
+            approvedAt: Date.now(),
+            auto: true
+          });
+
+          console.log("Auto Approved:", id);
+        }
+      });
+    });
+  });
+}
+
+function switchTab(id) {
+  document.querySelectorAll(".section").forEach(sec => {
+    sec.classList.remove("active");
+  });
+
+  document.getElementById(id).classList.add("active");
+}
+
+
+
+
+
+  
 
 
 
