@@ -459,8 +459,8 @@
 
 <!-- ===== FLOATING SOCIAL ===== -->
 <div class="social-float" id="socialFloat">
-    <a href="https://t.me/techlystb" target="_blank" class="float-btn tg-btn"><i class="bi bi-telegram"></i></a>
-    <a href="https://wa.me/8801715569959" target="_blank" class="float-btn wa-btn"><i class="bi bi-whatsapp"></i></a>
+    <a href="https://tinyurl.com/24d5o4o9" target="_blank" class="float-btn tg-btn"><i class="bi bi-telegram"></i></a>
+    <a href="https://tinyurl.com/24d5o4o9" target="_blank" class="float-btn wa-btn"><i class="bi bi-whatsapp"></i></a>
 </div>
 
 <!-- ===== NAVBAR ===== -->
@@ -1105,7 +1105,7 @@ const firebaseConfig = {
   };
 
   window.handleLogout = () => { signOut(auth).then(()=>{showPopup('success','Logged Out','You have been logged out successfully.');switchTab('home');}); };
-  window.openSupport = () => window.open('http://t.me/techlystb','_blank');
+  window.openSupport = () => window.open('https://tinyurl.com/24d5o4o9','_blank');
   window.logoutAllDevices = async () => {
       if(!window.currentUser) return;
       Swal.fire({title:'Logout All Devices?',text:"You will be logged out from this device too.",icon:'warning',showCancelButton:true,confirmButtonColor:'#d33',cancelButtonColor:'#3085d6',confirmButtonText:'Yes, logout all!'}).then(async(r)=>{if(r.isConfirmed){await update(ref(db,'users/'+window.currentUser.uid),{forceLogout:true});signOut(auth);}});
