@@ -1,418 +1,1013 @@
-<style>
-body {
-  margin: 0;
-  font-family: sans-serif;
-  background: #f1f5f9;
-}
-
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  display: flex;
-  background: white;
-  border-top: 1px solid #ddd;
-}
-
-.bottom-nav div {
-  flex: 1;
-  text-align: center;
-  padding: 10px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.bottom-nav div:hover {
-  background: #f3f4f6;
-}
-
-.section {
-  display: none;
-  padding: 15px;
-}
-
-.active {
-  display: block;
-}
-
-
-h2, h3 {
-  color: #333;
-}
-
-input {
-  padding: 10px;
-  width: 250px;
-}
-
-button {
-  padding: 8px 12px;
-  border: none;
-  background: #4F46E5;
-  color: white;
-  cursor: pointer;
-  margin: 5px;
-}
-
-.card {
-  background: white;
-  padding: 15px;
-  margin: 10px 0;
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
-
-  
-.stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-
-
-</style>
-
-<div id="admin-login">
-  <h2>Admin Login</h2>
-  <input type="email" id="email" placeholder="Email"><br><br>
-  <input type="password" id="password" placeholder="Password"><br><br>
-  <button onclick="adminLogin()">Login</button>
-</div>
-
-<div class="bottom-nav">
-  <div onclick="switchTab('home')">🏠<br>Home</div>
-  <div onclick="switchTab('history')">📊<br>History</div>
-  <div onclick="switchTab('wallet')">💰<br>Wallet</div>
-  <div onclick="switchTab('profile')">👤<br>Profile</div>
-</div>
-
-
-<div id="admin-dashboard" style="display:none;">
-  <h2>Admin Dashboard</h2>
-
-  <h3>📥 Submissions</h3>
-  <div id="submissionList"></div>
-
-  <h3>💸 Withdraw Requests</h3>
-  <div id="withdrawList"></div>
-</div>
-
-<h2>📊 Admin Analytics Dashboard</h2>
-
-<div class="stats">
-  <div class="card">Users: <span id="totalUsers">0</span></div>
-  <div class="card">Submissions: <span id="totalSub">0</span></div>
-  <div class="card">Approved: <span id="approvedSub">0</span></div>
-  <div class="card">Pending: <span id="pendingSub">0</span></div>
-  <div class="card">Rejected: <span id="rejectedSub">0</span></div>
-  <div class="card">Total Balance: <span id="totalBalance">0</span></div>
-</div>
-
-<canvas id="chart" height="100"></canvas>
-
-
-
-<div id="home" class="section active">🏠 Home Content</div>
-<div id="history" class="section">📊 History</div>
-<div id="wallet" class="section">💰 Wallet</div>
-<div id="profile" class="section">👤 Profile</div>
-
-
-<script>
-function adminLogin() {
-  const email = email.value;
-  const password = password.value;
-
-  firebase.auth().signInWithEmailAndPassword(email, password)
-  .then(userCred => {
-    const uid = userCred.user.uid;
-
-    firebase.database().ref("users/" + uid).once("value")
-    .then(snap => {
-      const data = snap.val();
-
-      if (data && data.isAdmin === true) {
-        document.getElementById("admin-login").style.display = "none";
-        document.getElementById("admin-dashboard").style.display = "block";
-
-        loadSubmissions();
-        loadWithdraws();
-      } else {
-        alert("Not Admin!");
-      }
-    });
-  });
-}
-
-
-function loadSubmissions() {
-  firebase.database().ref("submissions").on("value", snap => {
-    const data = snap.val();
-    const container = document.getElementById("submissionList");
-    container.innerHTML = "";
-
-    for (let id in data) {
-      const item = data[id];
-
-      const div = document.createElement("div");
-      div.className = "card";
-
-      div.innerHTML = `
-        <p>User: ${item.username}</p>
-        <p>Amount: ${item.totalAmount}</p>
-        <p>Status: ${item.status}</p>
-
-        ${item.status === "pending" ? `
-          <button onclick="approveSubmission('${id}','${item.userId}',${item.totalAmount})">Approve</button>
-          <button onclick="rejectSubmission('${id}')">Reject</button>
-        ` : ""}
-      `;
-
-      container.appendChild(div);
-    }
-  });
-}
-
-
-function approveSubmission(id, userId, amount) {
-  const db = firebase.database();
-
-  // status update
-  db.ref("submissions/" + id).update({
-    status: "approved"
-  });
-
-  // 🔥 HOLD → BALANCE TRANSFER
-  db.ref("users/" + userId).transaction(user => {
-    if (user) {
-      user.hold = (user.hold || 0) - amount;
-      user.balance = (user.balance || 0) + amount;
-    }
-    return user;
-  });
-
-  alert("Submission Approved ✅");
-}
-
-function rejectSubmission(id) {
-  firebase.database().ref("submissions/" + id).update({
-    status: "rejected"
-  });
-
-  alert("Rejected ❌");
-}
-
-function loadWithdraws() {
-  firebase.database().ref("withdraw_requests").on("value", snap => {
-    const data = snap.val();
-    const container = document.getElementById("withdrawList");
-    container.innerHTML = "";
-
-    for (let id in data) {
-      const item = data[id];
-
-      const div = document.createElement("div");
-      div.className = "card";
-
-      div.innerHTML = `
-        <p>User: ${item.username}</p>
-        <p>Amount: ${item.amount}</p>
-        <p>Status: ${item.status}</p>
-
-        ${item.status === "pending" ? `
-          <button onclick="approveWithdraw('${id}')">Approve</button>
-          <button onclick="rejectWithdraw('${id}','${item.userId}',${item.amount})">Reject</button>
-        ` : ""}
-      `;
-
-      container.appendChild(div);
-    }
-  });function approveWithdraw(id) {
-  firebase.database().ref("withdraw_requests/" + id).update({
-    status: "approved"
-  });
-
-  alert("Withdraw Approved 💸");
-}
-}
-
-function rejectWithdraw(id, userId, amount) {
-  const db = firebase.database();
-
-  db.ref("withdraw_requests/" + id).update({
-    status: "rejected"
-  });
-
-  // টাকা ফেরত
-  db.ref("users/" + userId).transaction(user => {
-    if (user) {
-      user.balance = (user.balance || 0) + amount;
-    }
-    return user;
-  });
-
-  alert("Withdraw Rejected & টাকা ফেরত ✅");
-}
-
-let chart;
-
-function loadDashboard() {
-
-  // 🔹 USERS
-  firebase.database().ref("users").on("value", snap => {
-    let totalUsers = 0;
-    let totalBalance = 0;
-
-    snap.forEach(child => {
-      totalUsers++;
-      totalBalance += Number(child.val().balance || 0);
-    });
-
-    document.getElementById("totalUsers").innerText = totalUsers;
-    document.getElementById("totalBalance").innerText = totalBalance;
-  });
-
-  // 🔹 SUBMISSIONS
-  firebase.database().ref("submissions").on("value", snap => {
-    let total = 0;
-    let approved = 0;
-    let pending = 0;
-    let rejected = 0;
-
-    let dailyData = {};
-
-    snap.forEach(child => {
-      const s = child.val();
-      total++;
-
-      if (s.status === "approved") approved++;
-      else if (s.status === "pending") pending++;
-      else if (s.status === "rejected") rejected++;
-
-      // 📊 Chart data
-      if (s.status === "approved") {
-        let date = new Date(s.submittedAt).toLocaleDateString();
-
-        if (!dailyData[date]) dailyData[date] = 0;
-        dailyData[date] += Number(s.totalAmount || 0);
-      }
-    });
-
-    document.getElementById("totalSub").innerText = total;
-    document.getElementById("approvedSub").innerText = approved;
-    document.getElementById("pendingSub").innerText = pending;
-    document.getElementById("rejectedSub").innerText = rejected;
-
-    updateChart(dailyData);
-  });
-
-}
-
-
-function updateChart(data) {
-  const labels = Object.keys(data);
-  const values = Object.values(data);
-
-  const ctx = document.getElementById("chart").getContext("2d");
-
-  if (chart) chart.destroy();
-
-  chart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [{
-        label: "Daily Earnings",
-        data: values,
-        borderWidth: 2
-      }]
-    }
-  });
-}
-
-function startAutoWithdrawBot() {
-  const db = firebase.database();
-
-  db.ref("withdraw_requests").on("value", snap => {
-    if (!snap.exists()) return;
-
-    snap.forEach(child => {
-      const id = child.key;
-      const data = child.val();
-
-      // শুধু pending হলে কাজ করবে
-      if (data.status !== "pending") return;
-
-      const userId = data.userId;
-      const amount = Number(data.amount || 0);
-
-      // 🔍 user data নাও
-      db.ref("users/" + userId).once("value").then(userSnap => {
-        const user = userSnap.val();
-        if (!user) return;
-
-        const balance = Number(user.balance || 0);
-
-        // ✅ condition: balance >= amount
-        if (balance >= 0) {
-          // 🔥 AUTO APPROVE
-          db.ref("withdraw_requests/" + id).update({
-            status: "approved",
-            approvedAt: Date.now(),
-            auto: true
-          });
-
-          console.log("Auto Approved:", id);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mail Factory - Admin Control Panel</title>
+    <meta name="theme-color" content="#0F172A">
+    <!-- Tailwind CSS & Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .swal2-container { z-index: 99999 !important; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+    <!-- LOGIN OVERLAY -->
+    <div id="adminAuthOverlay" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+            <div class="absolute -top-10 -right-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-amber-400/10 border border-amber-400/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <i class="bi bi-shield-lock-fill text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-black text-white">Mail Factory Admin</h2>
+                <p class="text-slate-400 text-xs mt-1">System Control Panel Authentication</p>
+            </div>
+
+            <form id="adminLoginForm" onsubmit="handleAdminLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Admin Email</label>
+                    <input type="email" id="adminAuthEmail" required value="soheltajbhola@gmail.com"
+                           class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-400 transition"
+                           placeholder="admin@mailfactory.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Admin Password</label>
+                    <input type="password" id="adminAuthPass" required value="admin123"
+                           class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-400 transition"
+                           placeholder="••••••••">
+                </div>
+                <button type="submit" id="adminLoginBtn"
+                        class="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black py-3.5 rounded-xl text-sm shadow-lg shadow-amber-500/20 transition active:scale-98">
+                    Login to Control Panel
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div id="adminMainContent" class="hidden min-h-screen flex flex-col">
+        
+        <!-- HEADER NAVBAR -->
+        <header class="bg-slate-950 border-b border-slate-800 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-amber-400">
+                        <i class="bi bi-shield-check text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg font-black text-white tracking-tight">Mail Factory Admin</h1>
+                            <span class="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Super Admin</span>
+                        </div>
+                        <p class="text-xs text-slate-400 font-medium">Logged in as <span id="displayAdminEmail" class="text-amber-400 font-bold">admin@mailfactory.com</span></p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="logoutAdmin()" class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl transition flex items-center gap-2">
+                        <i class="bi bi-box-arrow-right"></i> Logout Admin
+                    </button>
+                </div>
+            </div>
+
+            <!-- TABS NAVIGATION -->
+            <div class="max-w-7xl mx-auto px-4 flex items-center gap-1 overflow-x-auto no-scrollbar border-t border-slate-800/80 pt-2 pb-2">
+                <button onclick="switchTab('overview')" id="tab-overview" class="admin-tab active flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition whitespace-nowrap">
+                    <i class="bi bi-grid-1x2-fill"></i> Dashboard
+                </button>
+                <button onclick="switchTab('submissions')" id="tab-submissions" class="admin-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition whitespace-nowrap">
+                    <i class="bi bi-inbox-fill"></i> Submissions <span id="badge-submissions" class="hidden bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full">0</span>
+                </button>
+                <button onclick="switchTab('withdrawals')" id="tab-withdrawals" class="admin-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition whitespace-nowrap">
+                    <i class="bi bi-cash-stack"></i> Withdrawals <span id="badge-withdrawals" class="hidden bg-emerald-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full">0</span>
+                </button>
+                <button onclick="switchTab('users')" id="tab-users" class="admin-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition whitespace-nowrap">
+                    <i class="bi bi-people-fill"></i> Users Directory
+                </button>
+                <button onclick="switchTab('chat')" id="tab-chat" class="admin-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition whitespace-nowrap">
+                    <i class="bi bi-chat-dots-fill"></i> Support Chat <span id="badge-chat" class="hidden bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">0</span>
+                </button>
+                <button onclick="switchTab('settings')" id="tab-settings" class="admin-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition whitespace-nowrap">
+                    <i class="bi bi-gear-fill"></i> Settings & Rates
+                </button>
+                <button onclick="switchTab('broadcast')" id="tab-broadcast" class="admin-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition whitespace-nowrap">
+                    <i class="bi bi-megaphone-fill"></i> Push Alerts
+                </button>
+            </div>
+        </header>
+
+        <!-- DASHBOARD BODY CONTAINER -->
+        <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+
+            <!-- TAB 1: OVERVIEW / DASHBOARD -->
+            <div id="view-overview" class="admin-view space-y-6">
+                <!-- METRICS GRID -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div onclick="switchTab('submissions')" class="bg-slate-950 border border-slate-800 rounded-2xl p-5 hover:border-amber-400/50 transition cursor-pointer group">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Submissions</span>
+                            <div class="w-9 h-9 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center">
+                                <i class="bi bi-inbox text-lg"></i>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-black text-amber-400" id="stat-pending-subs">0</div>
+                        <div class="text-[11px] text-slate-500 font-bold mt-2 group-hover:text-amber-400 transition">Review Batches &rarr;</div>
+                    </div>
+
+                    <div onclick="switchTab('withdrawals')" class="bg-slate-950 border border-slate-800 rounded-2xl p-5 hover:border-emerald-400/50 transition cursor-pointer group">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Cashouts</span>
+                            <div class="w-9 h-9 rounded-xl bg-emerald-400/10 text-emerald-400 flex items-center justify-center">
+                                <i class="bi bi-wallet2 text-lg"></i>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-black text-emerald-400" id="stat-pending-wds">0</div>
+                        <div class="text-[11px] text-slate-500 font-bold mt-2 group-hover:text-emerald-400 transition">Process Withdrawals &rarr;</div>
+                    </div>
+
+                    <div onclick="switchTab('submissions')" class="bg-slate-950 border border-slate-800 rounded-2xl p-5 hover:border-indigo-400/50 transition cursor-pointer">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Approved Gmails</span>
+                            <div class="w-9 h-9 rounded-xl bg-indigo-400/10 text-indigo-400 flex items-center justify-center">
+                                <i class="bi bi-check-circle text-lg"></i>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-black text-indigo-400" id="stat-approved-gmails">0</div>
+                        <div class="text-[11px] text-slate-500 font-bold mt-2">Verified System Total</div>
+                    </div>
+
+                    <div onclick="switchTab('withdrawals')" class="bg-slate-950 border border-slate-800 rounded-2xl p-5 hover:border-purple-400/50 transition cursor-pointer">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Paid Out</span>
+                            <div class="w-9 h-9 rounded-xl bg-purple-400/10 text-purple-400 flex items-center justify-center">
+                                <i class="bi bi-cash text-lg"></i>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-black text-purple-400">৳<span id="stat-paid-bdt">0</span></div>
+                        <div class="text-[11px] text-slate-500 font-bold mt-2">Completed BDT Cashouts</div>
+                    </div>
+                </div>
+
+                <!-- SECONDARY METRICS GRID -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4">
+                        <span class="text-xs text-slate-400 font-medium">Total Registered Users</span>
+                        <div class="text-xl font-black text-white mt-1" id="stat-total-users">0</div>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4">
+                        <span class="text-xs text-slate-400 font-medium">Total User Main Balances</span>
+                        <div class="text-xl font-black text-emerald-400 mt-1">৳<span id="stat-user-balances">0.00</span></div>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4">
+                        <span class="text-xs text-slate-400 font-medium">Total User Hold Balances</span>
+                        <div class="text-xl font-black text-amber-400 mt-1">৳<span id="stat-user-holds">0.00</span></div>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4">
+                        <span class="text-xs text-slate-400 font-medium">Unread Support Chats</span>
+                        <div class="text-xl font-black text-rose-400 mt-1" id="stat-unread-chats">0</div>
+                    </div>
+                </div>
+
+                <!-- PENDING BATCHES SECTION -->
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                        <h3 class="font-extrabold text-white text-base flex items-center gap-2">
+                            <i class="bi bi-clock-history text-amber-400"></i> Pending Gmail Action Items
+                        </h3>
+                        <button onclick="switchTab('submissions')" class="text-xs text-amber-400 font-bold hover:underline">View All Submissions &rarr;</button>
+                    </div>
+                    <div id="overview-pending-container" class="space-y-3">
+                        <div class="text-center py-6 text-slate-500 text-xs">Loading pending items...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: SUBMISSIONS -->
+            <div id="view-submissions" class="admin-view hidden space-y-4">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-2">
+                        <button onclick="filterSubmissions('all')" id="sub-filter-all" class="sub-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-400 text-slate-950">All</button>
+                        <button onclick="filterSubmissions('pending')" id="sub-filter-pending" class="sub-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Pending</button>
+                        <button onclick="filterSubmissions('approved')" id="sub-filter-approved" class="sub-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Approved</button>
+                        <button onclick="filterSubmissions('rejected')" id="sub-filter-rejected" class="sub-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Rejected</button>
+                    </div>
+
+                    <div class="w-full sm:w-72">
+                        <input type="text" id="subSearchInput" oninput="renderSubmissionsList()" placeholder="Search user, ID or Gmail..."
+                               class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    </div>
+                </div>
+
+                <div id="submissionsListContainer" class="space-y-4">
+                    <!-- Dynamic Submissions Batches Card List -->
+                </div>
+            </div>
+
+            <!-- TAB 3: WITHDRAWALS -->
+            <div id="view-withdrawals" class="admin-view hidden space-y-4">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-2">
+                        <button onclick="filterWithdrawals('all')" id="wd-filter-all" class="wd-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-400 text-slate-950">All</button>
+                        <button onclick="filterWithdrawals('pending')" id="wd-filter-pending" class="wd-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Pending</button>
+                        <button onclick="filterWithdrawals('approved')" id="wd-filter-approved" class="wd-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Approved</button>
+                        <button onclick="filterWithdrawals('rejected')" id="wd-filter-rejected" class="wd-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Rejected</button>
+                    </div>
+
+                    <div class="w-full sm:w-72">
+                        <input type="text" id="wdSearchInput" oninput="renderWithdrawalsList()" placeholder="Search user, phone or ID..."
+                               class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    </div>
+                </div>
+
+                <div id="withdrawalsListContainer" class="space-y-3">
+                    <!-- Dynamic Withdrawals List -->
+                </div>
+            </div>
+
+            <!-- TAB 4: USERS DIRECTORY -->
+            <div id="view-users" class="admin-view hidden space-y-4">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-4">
+                    <h3 class="font-extrabold text-white text-sm">User Directory & Management</h3>
+                    <div class="w-full sm:w-80">
+                        <input type="text" id="userSearchInput" oninput="renderUsersList()" placeholder="Search username, email or code..."
+                               class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    </div>
+                </div>
+
+                <div id="usersListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Dynamic User Cards -->
+                </div>
+            </div>
+
+            <!-- TAB 5: LIVE CHAT -->
+            <div id="view-chat" class="admin-view hidden">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden grid grid-cols-1 md:grid-cols-3 min-h-[500px]">
+                    <div class="border-r border-slate-800 p-4 space-y-3">
+                        <h4 class="font-bold text-xs uppercase text-slate-400">Support Conversations</h4>
+                        <div id="chatUserList" class="space-y-2 max-h-[450px] overflow-y-auto no-scrollbar">
+                            <!-- List of users with support chats -->
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-2 flex flex-col bg-slate-900/50">
+                        <div id="chatHeader" class="p-4 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400">Select a user conversation from left</span>
+                        </div>
+                        <div id="chatMessagesBox" class="flex-1 p-4 space-y-3 overflow-y-auto max-h-[380px]">
+                            <!-- Chat Messages -->
+                        </div>
+                        <div class="p-3 border-t border-slate-800 bg-slate-950 flex gap-2">
+                            <input type="text" id="adminChatInput" placeholder="Type response..."
+                                   class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                                   onkeypress="if(event.key==='Enter') sendAdminChatMessage()">
+                            <button onclick="sendAdminChatMessage()" class="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs transition">
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 6: SETTINGS & RATES -->
+            <div id="view-settings" class="admin-view hidden space-y-6">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h3 class="font-extrabold text-white text-base">Platform Level Rates & Control Settings</h3>
+                        <button onclick="savePlatformSettings()" class="px-5 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/20 transition">
+                            Save Settings
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- RATES CONFIG -->
+                        <div class="space-y-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                            <h4 class="font-bold text-xs uppercase text-amber-400">Level Rates (BDT per Gmail)</h4>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Level 1 Rate (৳)</label>
+                                    <input type="number" id="setting-lvl1-rate" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Level 2 Rate (৳)</label>
+                                    <input type="number" id="setting-lvl2-rate" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Level 3 Rate (৳)</label>
+                                    <input type="number" id="setting-lvl3-rate" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Base Old Rate (৳)</label>
+                                    <input type="number" id="setting-old-rate" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BONUSES & COMMISSIONS -->
+                        <div class="space-y-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                            <h4 class="font-bold text-xs uppercase text-emerald-400">Bonuses & Withdraw Rules</h4>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 mb-1">New User Bonus (৳)</label>
+                                    <input type="number" id="setting-signup-bonus" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Referral Commission (%)</label>
+                                    <input type="number" id="setting-ref-comm" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Min Withdraw (৳)</label>
+                                    <input type="number" id="setting-min-withdraw" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Admin Email</label>
+                                    <input type="email" id="setting-admin-email" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TOGGLES -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex items-center justify-between p-4 bg-slate-900/60 border border-slate-800 rounded-xl">
+                            <div>
+                                <div class="text-xs font-bold text-white">Maintenance Mode</div>
+                                <div class="text-[10px] text-slate-400">Temporarily disables new submissions</div>
+                            </div>
+                            <input type="checkbox" id="setting-maintenance-toggle" class="w-5 h-5 accent-amber-400 cursor-pointer">
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-slate-900/60 border border-slate-800 rounded-xl">
+                            <div>
+                                <div class="text-xs font-bold text-white">Disable Withdrawals</div>
+                                <div class="text-[10px] text-slate-400">Prevents users from placing cashout requests</div>
+                            </div>
+                            <input type="checkbox" id="setting-withdraw-disabled-toggle" class="w-5 h-5 accent-amber-400 cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 7: BROADCAST & ALERTS -->
+            <div id="view-broadcast" class="admin-view hidden space-y-6">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 max-w-xl mx-auto space-y-4">
+                    <h3 class="font-extrabold text-white text-base flex items-center gap-2">
+                        <i class="bi bi-megaphone-fill text-amber-400"></i> Broadcast System Notification
+                    </h3>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Notification Title</label>
+                        <input type="text" id="notifTitleInput" placeholder="e.g. System Announcement"
+                               class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Target User ID (Optional, leave blank for all)</label>
+                        <input type="text" id="notifTargetUidInput" placeholder="all or User UID"
+                               class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Notification Message</label>
+                        <textarea id="notifMessageInput" rows="3" placeholder="Enter message text for users..."
+                                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"></textarea>
+                    </div>
+
+                    <button onclick="sendBroadcastAlert()" class="w-full bg-amber-400 hover:bg-amber-500 text-slate-950 font-black py-3 rounded-xl text-xs shadow-lg transition">
+                        Send Alert Notification
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- FIREBASE JS SDK MODULE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getDatabase, ref, set, get, update, push, onValue, increment, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
+            authDomain: "mail-fact.firebaseapp.com",
+            databaseURL: "https://mail-fact-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "mail-fact",
+            storageBucket: "mail-fact.firebasestorage.app",
+            messagingSenderId: "800577449702",
+            appId: "1:800577449702:web:0576286f40bfac40451527"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        const DEFAULT_ADMIN_EMAIL = "soheltajbhola@gmail.com";
+
+        window.db = db;
+        window.auth = auth;
+        window.allSubmissions = [];
+        window.allWithdrawals = [];
+        window.allUsers = [];
+        window.allChats = {};
+        window.platformSettings = {};
+        window.activeChatUid = null;
+        window.subFilter = 'all';
+        window.wdFilter = 'all';
+
+        // Check stored admin session
+        if (sessionStorage.getItem('mf_admin_logged_in') === 'true') {
+            document.getElementById('adminAuthOverlay').classList.add('hidden');
+            document.getElementById('adminMainContent').classList.remove('hidden');
         }
-      });
-    });
-  });
-}
 
-function switchTab(id) {
-  document.querySelectorAll(".section").forEach(sec => {
-    sec.classList.remove("active");
-  });
+        // 1. Admin Login Form Handler
+        window.handleAdminLogin = async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('adminAuthEmail').value.trim().toLowerCase();
+            const pass = document.getElementById('adminAuthPass').value;
+            const storedEmail = (localStorage.getItem('mf_admin_email') || DEFAULT_ADMIN_EMAIL).toLowerCase();
 
-  document.getElementById(id).classList.add("active");
-}
+            if (email === storedEmail && pass === 'admin123') {
+                sessionStorage.setItem('mf_admin_logged_in', 'true');
+                document.getElementById('adminAuthOverlay').classList.add('hidden');
+                document.getElementById('adminMainContent').classList.remove('hidden');
+                document.getElementById('displayAdminEmail').innerText = email;
+                Swal.fire({ icon: 'success', title: 'Admin Authorized', text: 'Welcome to Control Panel', timer: 1500, showConfirmButton: false });
+                initFirebaseListeners();
+            } else {
+                try {
+                    const res = await signInWithEmailAndPassword(auth, email, pass);
+                    if (res.user) {
+                        sessionStorage.setItem('mf_admin_logged_in', 'true');
+                        document.getElementById('adminAuthOverlay').classList.add('hidden');
+                        document.getElementById('adminMainContent').classList.remove('hidden');
+                        document.getElementById('displayAdminEmail').innerText = email;
+                        initFirebaseListeners();
+                    }
+                } catch(err) {
+                    Swal.fire({ icon: 'error', title: 'Access Denied', text: 'Invalid admin credentials' });
+                }
+            }
+        };
 
+        window.logoutAdmin = function() {
+            sessionStorage.removeItem('mf_admin_logged_in');
+            document.getElementById('adminMainContent').classList.add('hidden');
+            document.getElementById('adminAuthOverlay').classList.remove('hidden');
+        };
 
+        // 2. Realtime Database Listeners
+        function initFirebaseListeners() {
+            // Submissions
+            onValue(ref(db, 'submissions'), (snap) => {
+                const data = snap.exists() ? snap.val() : {};
+                window.allSubmissions = Object.keys(data).map(key => ({ key, ...data[key] }));
+                window.allSubmissions.sort((a,b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+                updateMetrics();
+                renderSubmissionsList();
+                renderOverviewPending();
+            });
 
+            // Withdrawals
+            onValue(ref(db, 'withdraw_requests'), (snap) => {
+                const data = snap.exists() ? snap.val() : {};
+                window.allWithdrawals = Object.keys(data).map(key => ({ key, ...data[key] }));
+                window.allWithdrawals.sort((a,b) => (b.requestedAt || 0) - (a.requestedAt || 0));
+                updateMetrics();
+                renderWithdrawalsList();
+            });
 
+            // Users
+            onValue(ref(db, 'users'), (snap) => {
+                const data = snap.exists() ? snap.val() : {};
+                window.allUsers = Object.keys(data).map(uid => ({ uid, ...data[uid] }));
+                updateMetrics();
+                renderUsersList();
+                renderChatUserList();
+            });
 
-  
+            // Support Chats
+            onValue(ref(db, 'support_chats'), (snap) => {
+                window.allChats = snap.exists() ? snap.val() : {};
+                updateMetrics();
+                renderChatUserList();
+                if (window.activeChatUid) renderChatMessages(window.activeChatUid);
+            });
 
+            // Settings
+            onValue(ref(db, 'settings'), (snap) => {
+                window.platformSettings = snap.exists() ? snap.val() : {};
+                loadSettingsInputs();
+            });
+        }
 
+        // Metrics Calculation
+        function updateMetrics() {
+            const pendingSubs = window.allSubmissions.filter(s => s.status === 'pending').length;
+            const pendingWds = window.allWithdrawals.filter(w => w.status === 'pending').length;
+            
+            let approvedGmails = 0;
+            window.allSubmissions.forEach(s => {
+                if (s.gmails && Array.isArray(s.gmails)) {
+                    approvedGmails += s.gmails.filter(g => g.status === 'approved').length;
+                } else if (s.status === 'approved') {
+                    approvedGmails += (s.count || 0);
+                }
+            });
 
+            const paidOutBDT = window.allWithdrawals
+                .filter(w => w.status === 'approved')
+                .reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
 
-  
-  
-</script>
+            let totalMainBal = 0;
+            let totalHoldBal = 0;
+            window.allUsers.forEach(u => {
+                totalMainBal += (Number(u.balance) || 0);
+                totalHoldBal += (Number(u.hold) || 0);
+            });
 
+            let unreadChats = 0;
+            Object.keys(window.allChats).forEach(uid => {
+                const msgs = window.allChats[uid] || {};
+                Object.values(msgs).forEach(m => {
+                    if (m.from === 'user' && !m.read) unreadChats++;
+                });
+            });
 
+            document.getElementById('stat-pending-subs').innerText = pendingSubs;
+            document.getElementById('stat-pending-wds').innerText = pendingWds;
+            document.getElementById('stat-approved-gmails').innerText = approvedGmails;
+            document.getElementById('stat-paid-bdt').innerText = paidOutBDT.toFixed(0);
+            document.getElementById('stat-total-users').innerText = window.allUsers.length;
+            document.getElementById('stat-user-balances').innerText = totalMainBal.toFixed(2);
+            document.getElementById('stat-user-holds').innerText = totalHoldBal.toFixed(2);
+            document.getElementById('stat-unread-chats').innerText = unreadChats;
 
+            const badgeSub = document.getElementById('badge-submissions');
+            if (pendingSubs > 0) { badgeSub.innerText = pendingSubs; badgeSub.classList.remove('hidden'); }
+            else { badgeSub.classList.add('hidden'); }
 
+            const badgeWd = document.getElementById('badge-withdrawals');
+            if (pendingWds > 0) { badgeWd.innerText = pendingWds; badgeWd.classList.remove('hidden'); }
+            else { badgeWd.classList.add('hidden'); }
 
-    
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            const badgeChat = document.getElementById('badge-chat');
+            if (unreadChats > 0) { badgeChat.innerText = unreadChats; badgeChat.classList.remove('hidden'); }
+            else { badgeChat.classList.add('hidden'); }
+        }
 
+        // Render Pending Overview Items
+        function renderOverviewPending() {
+            const container = document.getElementById('overview-pending-container');
+            const pending = window.allSubmissions.filter(s => s.status === 'pending').slice(0, 4);
 
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+            if (pending.length === 0) {
+                container.innerHTML = '<div class="p-6 text-center text-slate-500 text-xs">✓ All Gmail submissions are currently reviewed!</div>';
+                return;
+            }
 
-<script>
-const firebaseConfig = {
- apiKey: "AIzaSyBO-1q2JTgj5w49ExP1qJWKw2Kgl-ncxNk",
-  authDomain: "mail-fact.firebaseapp.com",
-  databaseURL: "https://mail-fact-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "mail-fact"
-};
+            container.innerHTML = pending.map(b => `
+                <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div>
+                        <div class="font-extrabold text-white text-sm">${b.username || 'User'}</div>
+                        <div class="text-slate-400 mt-0.5">${b.count || 0} Gmails @ ৳${b.rate || 10}/ea = <b class="text-emerald-400">৳${b.totalAmount || 0}</b></div>
+                    </div>
+                    <button onclick="switchTab('submissions')" class="px-3 py-1.5 bg-amber-400 text-slate-950 font-black rounded-lg text-xs">Review Batch</button>
+                </div>
+            `).join('');
+        }
 
-firebase.initializeApp(firebaseConfig);
-</script>
+        // Render Submissions List
+        window.renderSubmissionsList = function() {
+            const container = document.getElementById('submissionsListContainer');
+            const search = (document.getElementById('subSearchInput').value || '').toLowerCase();
 
+            let list = window.allSubmissions.filter(s => {
+                const matchesFilter = window.subFilter === 'all' || s.status === window.subFilter;
+                const matchesSearch = (s.username || '').toLowerCase().includes(search) ||
+                                      (s.userId || '').toLowerCase().includes(search) ||
+                                      (s.gmails && s.gmails.some(g => (g.email || '').toLowerCase().includes(search)));
+                return matchesFilter && matchesSearch;
+            });
 
+            if (list.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center text-slate-500 text-xs bg-slate-950 rounded-2xl border border-slate-800">No submissions matching criteria.</div>';
+                return;
+            }
+
+            container.innerHTML = list.map(b => {
+                const gmails = b.gmails || [];
+                const gmailsHtml = gmails.map((g, idx) => `
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                        <div class="font-mono text-slate-200 truncate max-w-[180px] sm:max-w-xs">${g.email} <span class="text-slate-500">| ${g.password || ''}</span></div>
+                        <div class="flex items-center gap-1">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${g.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : (g.status === 'rejected' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400')}">
+                                ${g.status || 'pending'}
+                            </span>
+                            <button onclick="updateSingleGmailStatus('${b.key}', ${idx}, 'approved')" class="px-2 py-1 bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white rounded text-[10px] font-bold">✓</button>
+                            <button onclick="updateSingleGmailStatus('${b.key}', ${idx}, 'rejected')" class="px-2 py-1 bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white rounded text-[10px] font-bold">✕</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                            <div>
+                                <span class="text-sm font-black text-white">${b.username || 'User'}</span>
+                                <span class="text-xs text-slate-500 ml-2">UID: ${b.userId}</span>
+                                <div class="text-[11px] text-slate-400 mt-0.5">${new Date(b.submittedAt || Date.now()).toLocaleString()} • ${b.count || 0} Gmails @ ৳${b.rate}/ea = <b class="text-amber-400">৳${b.totalAmount}</b></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="processBatchStatus('${b.key}', 'approved')" class="px-3 py-1.5 bg-emerald-500 text-slate-950 font-black rounded-xl text-xs hover:bg-emerald-400">Approve All</button>
+                                <button onclick="processBatchStatus('${b.key}', 'rejected')" class="px-3 py-1.5 bg-rose-500 text-white font-black rounded-xl text-xs hover:bg-rose-400">Reject All</button>
+                            </div>
+                        </div>
+                        <div class="space-y-1.5">${gmailsHtml}</div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        window.filterSubmissions = function(f) {
+            window.subFilter = f;
+            document.querySelectorAll('.sub-filter-btn').forEach(b => {
+                b.classList.remove('bg-amber-400', 'text-slate-950');
+                b.classList.add('text-slate-400');
+            });
+            document.getElementById(`sub-filter-${f}`).classList.add('bg-amber-400', 'text-slate-950');
+            renderSubmissionsList();
+        };
+
+        // Update Single Gmail Status
+        window.updateSingleGmailStatus = async function(batchKey, gmailIndex, newStatus) {
+            const batch = window.allSubmissions.find(s => s.key === batchKey);
+            if (!batch || !batch.gmails) return;
+
+            const updatedGmails = [...batch.gmails];
+            const oldGmailStatus = updatedGmails[gmailIndex].status || 'pending';
+            updatedGmails[gmailIndex].status = newStatus;
+
+            const approvedCount = updatedGmails.filter(g => g.status === 'approved').length;
+            const rejectedCount = updatedGmails.filter(g => g.status === 'rejected').length;
+
+            let batchStatus = 'pending';
+            if (approvedCount === updatedGmails.length) batchStatus = 'approved';
+            else if (rejectedCount === updatedGmails.length) batchStatus = 'rejected';
+            else if (approvedCount > 0 || rejectedCount > 0) batchStatus = 'partial';
+
+            await update(ref(db, `submissions/${batchKey}`), { gmails: updatedGmails, status: batchStatus });
+
+            // Adjust User Balance & Hold
+            const userRef = ref(db, `users/${batch.userId}`);
+            const userSnap = await get(userRef);
+            if (userSnap.exists()) {
+                const uData = userSnap.val();
+                let currentBal = Number(uData.balance) || 0;
+                let currentHold = Number(uData.hold) || 0;
+                let approvedManual = Number(uData.manual_approved_count) || 0;
+                const perGmailAmt = batch.rate || 10;
+
+                if (oldGmailStatus !== 'approved' && newStatus === 'approved') {
+                    currentBal += perGmailAmt;
+                    currentHold = Math.max(0, currentHold - perGmailAmt);
+                    approvedManual += 1;
+                } else if (oldGmailStatus === 'approved' && newStatus !== 'approved') {
+                    currentBal = Math.max(0, currentBal - perGmailAmt);
+                    approvedManual = Math.max(0, approvedManual - 1);
+                } else if (oldGmailStatus === 'pending' && newStatus === 'rejected') {
+                    currentHold = Math.max(0, currentHold - perGmailAmt);
+                }
+
+                await update(userRef, { balance: currentBal, hold: currentHold, manual_approved_count: approvedManual });
+            }
+        };
+
+        // Approve or Reject Whole Batch
+        window.processBatchStatus = async function(batchKey, newStatus) {
+            const batch = window.allSubmissions.find(s => s.key === batchKey);
+            if (!batch || !batch.gmails) return;
+
+            for (let i = 0; i < batch.gmails.length; i++) {
+                await updateSingleGmailStatus(batchKey, i, newStatus);
+            }
+            Swal.fire({ icon: 'success', title: 'Batch Updated', timer: 1000, showConfirmButton: false });
+        };
+
+        // Render Withdrawals List
+        window.renderWithdrawalsList = function() {
+            const container = document.getElementById('withdrawalsListContainer');
+            const search = (document.getElementById('wdSearchInput').value || '').toLowerCase();
+
+            let list = window.allWithdrawals.filter(w => {
+                const matchesFilter = window.wdFilter === 'all' || w.status === window.wdFilter;
+                const matchesSearch = (w.username || '').toLowerCase().includes(search) ||
+                                      (w.paymentNumber || '').toLowerCase().includes(search) ||
+                                      (w.userId || '').toLowerCase().includes(search);
+                return matchesFilter && matchesSearch;
+            });
+
+            if (list.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center text-slate-500 text-xs bg-slate-950 rounded-2xl border border-slate-800">No withdrawal requests found.</div>';
+                return;
+            }
+
+            container.innerHTML = list.map(w => `
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-extrabold text-white text-sm">${w.username || 'User'}</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase ${w.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : (w.status === 'rejected' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400')}">${w.status}</span>
+                        </div>
+                        <div class="text-xs text-slate-400 mt-1 font-mono">${w.paymentMethod || w.method || 'bKash'}: <b class="text-amber-400 font-bold">${w.paymentNumber}</b></div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">${new Date(w.requestedAt || Date.now()).toLocaleString()} • UID: ${w.userId}</div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <div class="text-right mr-2">
+                            <div class="text-lg font-black text-emerald-400">৳${w.amount}</div>
+                        </div>
+                        ${w.status === 'pending' ? `
+                            <button onclick="processWithdrawalStatus('${w.key}', 'approved')" class="px-3 py-1.5 bg-emerald-500 text-slate-950 font-black rounded-xl text-xs hover:bg-emerald-400">Approve</button>
+                            <button onclick="processWithdrawalStatus('${w.key}', 'rejected')" class="px-3 py-1.5 bg-rose-500 text-white font-black rounded-xl text-xs hover:bg-rose-400">Reject & Refund</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        window.filterWithdrawals = function(f) {
+            window.wdFilter = f;
+            document.querySelectorAll('.wd-filter-btn').forEach(b => {
+                b.classList.remove('bg-amber-400', 'text-slate-950');
+                b.classList.add('text-slate-400');
+            });
+            document.getElementById(`wd-filter-${f}`).classList.add('bg-amber-400', 'text-slate-950');
+            renderWithdrawalsList();
+        };
+
+        window.processWithdrawalStatus = async function(reqKey, newStatus) {
+            const req = window.allWithdrawals.find(w => w.key === reqKey);
+            if (!req) return;
+
+            await update(ref(db, `withdraw_requests/${reqKey}`), { status: newStatus });
+
+            if (newStatus === 'rejected') {
+                const userRef = ref(db, `users/${req.userId}`);
+                const snap = await get(userRef);
+                if (snap.exists()) {
+                    const uData = snap.val();
+                    const currentBal = Number(uData.balance) || 0;
+                    await update(userRef, { balance: currentBal + Number(req.amount) });
+                }
+            }
+            Swal.fire({ icon: 'success', title: `Withdrawal ${newStatus}`, timer: 1000, showConfirmButton: false });
+        };
+
+        // Render Users List
+        window.renderUsersList = function() {
+            const container = document.getElementById('usersListContainer');
+            const search = (document.getElementById('userSearchInput').value || '').toLowerCase();
+
+            let list = window.allUsers.filter(u => {
+                return (u.username || '').toLowerCase().includes(search) ||
+                       (u.email || '').toLowerCase().includes(search) ||
+                       (u.referralCode || '').toLowerCase().includes(search);
+            });
+
+            if (list.length === 0) {
+                container.innerHTML = '<div class="col-span-2 p-8 text-center text-slate-500 text-xs bg-slate-950 rounded-2xl border border-slate-800">No users found.</div>';
+                return;
+            }
+
+            container.innerHTML = list.map(u => `
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-amber-400/20 text-amber-400 font-black flex items-center justify-center text-sm border border-amber-400/30">
+                                ${(u.username || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div class="font-extrabold text-white text-sm">${u.username || 'User'}</div>
+                                <div class="text-[11px] text-slate-400">${u.email || 'N/A'}</div>
+                            </div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase ${u.is_blocked ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}">
+                            ${u.is_blocked ? 'Blocked' : 'Active'}
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="bg-slate-900 p-2 rounded-xl border border-slate-800">
+                            <span class="text-slate-500 text-[10px]">Main Balance</span>
+                            <div class="font-black text-emerald-400">৳${Number(u.balance || 0).toFixed(2)}</div>
+                        </div>
+                        <div class="bg-slate-900 p-2 rounded-xl border border-slate-800">
+                            <span class="text-slate-500 text-[10px]">Hold Balance</span>
+                            <div class="font-black text-amber-400">৳${Number(u.hold || 0).toFixed(2)}</div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <button onclick="modifyUserBalance('${u.uid}', true)" class="flex-1 px-2.5 py-1.5 bg-emerald-600/30 text-emerald-300 font-bold rounded-xl text-xs hover:bg-emerald-600 hover:text-white">+ Add BDT</button>
+                        <button onclick="modifyUserBalance('${u.uid}', false)" class="flex-1 px-2.5 py-1.5 bg-rose-600/30 text-rose-300 font-bold rounded-xl text-xs hover:bg-rose-600 hover:text-white">- Deduct BDT</button>
+                        <button onclick="toggleUserBlock('${u.uid}', ${!u.is_blocked})" class="px-3 py-1.5 ${u.is_blocked ? 'bg-emerald-500 text-slate-950' : 'bg-rose-600/30 text-rose-400'} font-bold rounded-xl text-xs">
+                            ${u.is_blocked ? 'Unblock' : 'Block'}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        window.modifyUserBalance = async function(uid, isAdd) {
+            const { value: amount } = await Swal.fire({
+                title: isAdd ? 'Add Balance' : 'Deduct Balance',
+                input: 'number',
+                inputLabel: 'Enter BDT Amount',
+                showCancelButton: true
+            });
+
+            if (amount && Number(amount) > 0) {
+                const amt = Number(amount);
+                const userRef = ref(db, `users/${uid}`);
+                const snap = await get(userRef);
+                if (snap.exists()) {
+                    const uData = snap.val();
+                    let current = Number(uData.balance) || 0;
+                    const updated = isAdd ? current + amt : Math.max(0, current - amt);
+                    await update(userRef, { balance: updated });
+                    Swal.fire({ icon: 'success', title: 'Balance Updated', timer: 1000, showConfirmButton: false });
+                }
+            }
+        };
+
+        window.toggleUserBlock = async function(uid, shouldBlock) {
+            await update(ref(db, `users/${uid}`), { is_blocked: shouldBlock });
+            Swal.fire({ icon: 'success', title: shouldBlock ? 'User Blocked' : 'User Unblocked', timer: 1000, showConfirmButton: false });
+        };
+
+        // Render Chat Users
+        function renderChatUserList() {
+            const container = document.getElementById('chatUserList');
+            const uids = Object.keys(window.allChats);
+
+            if (uids.length === 0) {
+                container.innerHTML = '<div class="p-4 text-center text-slate-500 text-xs">No support chats yet</div>';
+                return;
+            }
+
+            container.innerHTML = uids.map(uid => {
+                const userObj = window.allUsers.find(u => u.uid === uid) || {};
+                const name = userObj.username || 'User';
+                const msgs = window.allChats[uid] || {};
+                const unread = Object.values(msgs).filter(m => m.from === 'user' && !m.read).length;
+
+                return `
+                    <div onclick="openAdminChat('${uid}')" class="p-3 rounded-xl ${window.activeChatUid === uid ? 'bg-amber-400 text-slate-950 font-bold' : 'bg-slate-900 hover:bg-slate-800 text-white'} cursor-pointer flex items-center justify-between text-xs">
+                        <div>
+                            <div class="font-extrabold">${name}</div>
+                            <div class="text-[10px] opacity-75">UID: ${uid.substring(0,8)}...</div>
+                        </div>
+                        ${unread > 0 ? `<span class="bg-rose-500 text-white px-2 py-0.5 rounded-full text-[10px] font-black">${unread}</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.openAdminChat = function(uid) {
+            window.activeChatUid = uid;
+            renderChatUserList();
+            renderChatMessages(uid);
+        };
+
+        function renderChatMessages(uid) {
+            const box = document.getElementById('chatMessagesBox');
+            const header = document.getElementById('chatHeader');
+            const userObj = window.allUsers.find(u => u.uid === uid) || {};
+
+            header.innerHTML = `<span class="text-xs font-bold text-white">Chatting with: <b class="text-amber-400">${userObj.username || 'User'}</b> (${userObj.email || ''})</span>`;
+
+            const msgsObj = window.allChats[uid] || {};
+            const msgs = Object.keys(msgsObj).map(k => ({ key: k, ...msgsObj[k] })).sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+            box.innerHTML = msgs.map(m => `
+                <div class="flex flex-col ${m.from === 'admin' ? 'items-end' : 'items-start'}">
+                    <div class="max-w-[80%] px-3 py-2 rounded-2xl text-xs ${m.from === 'admin' ? 'bg-amber-400 text-slate-950 font-semibold' : 'bg-slate-800 text-white'}">
+                        ${m.message}
+                    </div>
+                    <span class="text-[9px] text-slate-500 mt-1">${new Date(m.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
+            `).join('');
+
+            box.scrollTop = box.scrollHeight;
+        }
+
+        window.sendAdminChatMessage = async function() {
+            const input = document.getElementById('adminChatInput');
+            const text = input.value.trim();
+            if (!text || !window.activeChatUid) return;
+
+            await push(ref(db, `support_chats/${window.activeChatUid}`), {
+                uid: window.activeChatUid,
+                message: text,
+                from: 'admin',
+                timestamp: Date.now()
+            });
+
+            input.value = '';
+        };
+
+        // Load Settings Inputs
+        function loadSettingsInputs() {
+            const s = window.platformSettings || {};
+            const levels = s.levels || {};
+
+            document.getElementById('setting-lvl1-rate').value = levels['1']?.new_rate || 10;
+            document.getElementById('setting-lvl2-rate').value = levels['2']?.new_rate || 12;
+            document.getElementById('setting-lvl3-rate').value = levels['3']?.new_rate || 15;
+            document.getElementById('setting-old-rate').value = levels['1']?.old_rate || 8;
+
+            document.getElementById('setting-signup-bonus').value = s.signup_bonus_user || 10;
+            document.getElementById('setting-ref-comm').value = s.commission_percent || 5;
+            document.getElementById('setting-min-withdraw').value = s.min_withdraw || 100;
+            document.getElementById('setting-admin-email').value = localStorage.getItem('mf_admin_email') || DEFAULT_ADMIN_EMAIL;
+
+            document.getElementById('setting-maintenance-toggle').checked = !!s.maintenance_mode;
+            document.getElementById('setting-withdraw-disabled-toggle').checked = !!s.withdraw_disabled;
+        }
+
+        window.savePlatformSettings = async function() {
+            const lvl1 = Number(document.getElementById('setting-lvl1-rate').value) || 10;
+            const lvl2 = Number(document.getElementById('setting-lvl2-rate').value) || 12;
+            const lvl3 = Number(document.getElementById('setting-lvl3-rate').value) || 15;
+            const oldRate = Number(document.getElementById('setting-old-rate').value) || 8;
+
+            const signupBonus = Number(document.getElementById('setting-signup-bonus').value) || 10;
+            const refComm = Number(document.getElementById('setting-ref-comm').value) || 5;
+            const minWd = Number(document.getElementById('setting-min-withdraw').value) || 100;
+            const adminEmailInput = document.getElementById('setting-admin-email').value.trim();
+
+            if (adminEmailInput) localStorage.setItem('mf_admin_email', adminEmailInput);
+
+            const updatedSettings = {
+                ...window.platformSettings,
+                levels: {
+                    '1': { req: 0, new_rate: lvl1, old_rate: oldRate },
+                    '2': { req: 40, new_rate: lvl2, old_rate: oldRate + 1 },
+                    '3': { req: 100, new_rate: lvl3, old_rate: oldRate + 2 }
+                },
+                signup_bonus_user: signupBonus,
+                commission_percent: refComm,
+                min_withdraw: minWd,
+                maintenance_mode: document.getElementById('setting-maintenance-toggle').checked,
+                withdraw_disabled: document.getElementById('setting-withdraw-disabled-toggle').checked
+            };
+
+            await update(ref(db, 'settings'), updatedSettings);
+            Swal.fire({ icon: 'success', title: 'Platform Settings Saved', timer: 1500, showConfirmButton: false });
+        };
+
+        // Broadcast Alert
+        window.sendBroadcastAlert = async function() {
+            const title = document.getElementById('notifTitleInput').value.trim();
+            const targetUid = document.getElementById('notifTargetUidInput').value.trim() || 'all';
+            const message = document.getElementById('notifMessageInput').value.trim();
+
+            if (!title || !message) {
+                Swal.fire({ icon: 'error', title: 'Missing Data', text: 'Title and message required' });
+                return;
+            }
+
+            await push(ref(db, 'admin_notifications'), {
+                title,
+                message,
+                userId: targetUid,
+                timestamp: Date.now()
+            });
+
+            document.getElementById('notifTitleInput').value = '';
+            document.getElementById('notifMessageInput').value = '';
+            Swal.fire({ icon: 'success', title: 'Alert Broadcasted', timer: 1500, showConfirmButton: false });
+        };
+
+        // Navigation Tab Switching
+        window.switchTab = function(tabId) {
+            document.querySelectorAll('.admin-view').forEach(v => v.classList.add('hidden'));
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('bg-amber-400', 'text-slate-950'));
+            
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const tabBtn = document.getElementById(`tab-${tabId}`);
+            if (tabBtn) tabBtn.classList.add('bg-amber-400', 'text-slate-950');
+        };
+
+    </script>
+</body>
+</html>
